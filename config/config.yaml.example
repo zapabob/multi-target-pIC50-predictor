@@ -1,0 +1,85 @@
+# DAT Activity Predictor + TxGemma AI - Configuration Template
+# Copy this file to config.yaml and modify as needed
+
+# アプリケーション設定
+app:
+  name: "DAT Activity Predictor + TxGemma AI"
+  version: "1.0.0"
+  environment: "development"  # development, staging, production
+  debug: true
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+  max_requests: 1000
+  max_requests_jitter: 100
+
+# データベース設定
+database:
+  url: "postgresql://dat_user:dat_password@localhost:5432/dat_predictor"
+  pool_size: 5
+  max_overflow: 10
+  pool_timeout: 30
+  pool_recycle: 3600
+  echo: false
+
+# Redis設定
+redis:
+  url: "redis://localhost:6379/0"
+  max_connections: 10
+  socket_timeout: 5
+  socket_connect_timeout: 5
+  retry_on_timeout: true
+
+# モデル設定
+models:
+  cache_dir: "./cache/models"
+  default_batch_size: 32
+  max_batch_size: 128
+  model_timeout: 300
+
+# TxGemma設定
+txgemma:
+  host: "http://localhost:11434"
+  model_name: "txgemma:9b-chat-q6_k"
+  timeout: 60
+  max_retries: 3
+  conversation_history_limit: 10
+
+# ログ設定
+logging:
+  level: "DEBUG"
+  format: "text"
+  file: "./logs/app.log"
+  max_size: "10MB"
+  backup_count: 3
+
+# 監視設定
+monitoring:
+  enabled: false
+  metrics_port: 9091
+  health_check_interval: 30
+
+# セキュリティ設定
+security:
+  secret_key: "your-secret-key-here"
+  algorithm: "HS256"
+  access_token_expire_minutes: 30
+  cors_origins: ["http://localhost:3000", "http://localhost:8000"]
+  cors_methods: ["GET", "POST", "PUT", "DELETE"]
+  cors_headers: ["*"]
+
+# パフォーマンス設定
+performance:
+  gpu:
+    device: "cuda:0"
+    mixed_precision: true
+    gradient_checkpointing: true
+    memory_fraction: 0.8
+  cpu:
+    num_workers: 2
+    pin_memory: true
+    prefetch_factor: 2
+  cache:
+    ttl: 3600
+    max_size: "500MB"
+    cleanup_interval: 300

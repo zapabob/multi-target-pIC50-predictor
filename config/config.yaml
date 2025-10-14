@@ -1,0 +1,207 @@
+# DAT Activity Predictor + TxGemma AI - Production Configuration
+
+# アプリケーション設定
+app:
+  name: "DAT Activity Predictor + TxGemma AI"
+  version: "1.0.0"
+  environment: "production"
+  debug: false
+  host: "0.0.0.0"
+  port: 8000
+  workers: 4
+  max_requests: 1000
+  max_requests_jitter: 100
+
+# データベース設定
+database:
+  url: "postgresql://dat_user:dat_password@postgres:5432/dat_predictor"
+  pool_size: 10
+  max_overflow: 20
+  pool_timeout: 30
+  pool_recycle: 3600
+  echo: false
+
+# Redis設定
+redis:
+  url: "redis://redis:6379/0"
+  max_connections: 20
+  socket_timeout: 5
+  socket_connect_timeout: 5
+  retry_on_timeout: true
+
+# モデル設定
+models:
+  cache_dir: "/app/cache/models"
+  default_batch_size: 32
+  max_batch_size: 128
+  model_timeout: 300
+  
+  # Transformer設定
+  transformer:
+    hidden_dim: 256
+    num_layers: 3
+    num_heads: 4
+    dropout: 0.1
+    learning_rate: 1e-3
+    weight_decay: 1e-5
+  
+  # GNN設定
+  gnn:
+    hidden_dim: 128
+    num_layers: 3
+    num_heads: 4
+    dropout: 0.1
+    pool_method: "mean"
+    use_edge_features: true
+  
+  # アンサンブル設定
+  ensemble:
+    method: "weighted_average"
+    include_transformer: true
+    include_gnn: true
+    include_xgboost: true
+
+# TxGemma設定
+txgemma:
+  host: "http://ollama:11434"
+  model_name: "txgemma:9b-chat-q6_k"
+  timeout: 60
+  max_retries: 3
+  conversation_history_limit: 10
+  
+  # プロンプト設定
+  prompts:
+    system_prompt: "medicinal_chemist"
+    max_tokens: 1000
+    temperature: 0.7
+    top_p: 0.9
+
+# 特徴量設定
+features:
+  cache_dir: "/app/cache/features"
+  use_rdkit: true
+  use_ecfp4: true
+  use_maccs: true
+  use_smarts: true
+  use_3d: false  # 本番では計算コストのため無効
+  
+  # グラフ特徴量
+  graph:
+    node_feature_dim: 150
+    edge_feature_dim: 14
+    max_atoms: 100
+    max_bonds: 200
+
+# 不確実性推定設定
+uncertainty:
+  method: "mc_dropout"  # "mc_dropout" or "ensemble"
+  n_samples: 30
+  confidence_level: 0.95
+  batch_size: 16
+
+# Active Learning設定
+active_learning:
+  strategy: "uncertainty"  # "uncertainty", "diversity", "qbc", "hybrid"
+  batch_size: 10
+  diversity_weight: 0.3
+  max_suggestions: 50
+
+# ログ設定
+logging:
+  level: "INFO"
+  format: "json"
+  file: "/app/logs/app.log"
+  max_size: "100MB"
+  backup_count: 5
+  
+  # ログローテーション
+  rotation:
+    when: "midnight"
+    interval: 1
+    backup_count: 30
+
+# 監視設定
+monitoring:
+  enabled: true
+  metrics_port: 9091
+  health_check_interval: 30
+  
+  # Prometheus設定
+  prometheus:
+    enabled: true
+    port: 9091
+    path: "/metrics"
+  
+  # Sentry設定
+  sentry:
+    enabled: true
+    dsn: "${SENTRY_DSN}"
+    environment: "production"
+    traces_sample_rate: 0.1
+
+# セキュリティ設定
+security:
+  secret_key: "${SECRET_KEY}"
+  algorithm: "HS256"
+  access_token_expire_minutes: 30
+  cors_origins: ["*"]
+  cors_methods: ["GET", "POST", "PUT", "DELETE"]
+  cors_headers: ["*"]
+
+# パフォーマンス設定
+performance:
+  # GPU設定
+  gpu:
+    device: "cuda:0"
+    mixed_precision: true
+    gradient_checkpointing: true
+    memory_fraction: 0.8
+  
+  # CPU設定
+  cpu:
+    num_workers: 4
+    pin_memory: true
+    prefetch_factor: 2
+  
+  # キャッシュ設定
+  cache:
+    ttl: 3600  # 1時間
+    max_size: "1GB"
+    cleanup_interval: 300  # 5分
+
+# ターゲット設定
+targets:
+  DAT:
+    chembl_id: "CHEMBL238"
+    name: "Dopamine Transporter"
+    enabled: true
+  
+  5HT2A:
+    chembl_id: "CHEMBL224"
+    name: "Serotonin 2A Receptor"
+    enabled: true
+  
+  CB1:
+    chembl_id: "CHEMBL218"
+    name: "Cannabinoid Receptor 1"
+    enabled: true
+  
+  CB2:
+    chembl_id: "CHEMBL1861"
+    name: "Cannabinoid Receptor 2"
+    enabled: true
+  
+  mu_opioid:
+    chembl_id: "CHEMBL233"
+    name: "mu-Opioid Receptor"
+    enabled: true
+  
+  delta_opioid:
+    chembl_id: "CHEMBL236"
+    name: "delta-Opioid Receptor"
+    enabled: true
+  
+  kappa_opioid:
+    chembl_id: "CHEMBL237"
+    name: "kappa-Opioid Receptor"
+    enabled: true

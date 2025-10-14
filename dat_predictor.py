@@ -13,7 +13,11 @@ from functools import partial
 import numpy as np
 import pandas as pd
 from rdkit import Chem
-from rdkit.Chem import Descriptors, Draw, AllChem, MACCSkeys, Crippen
+from rdkit.Chem.Descriptors import MolWt, NumHDonors, NumHAcceptors, NumRotatableBonds, TPSA, FractionCSP3, BalabanJ, BertzCT, HeavyAtomCount
+from rdkit.Chem.Crippen import MolLogP
+from rdkit.Chem import rdMolDescriptors
+from rdkit.Chem.MACCSkeys import GenMACCSKeys
+from rdkit.Chem.Draw import MolToImage
 from chembl_webresource_client.new_client import new_client
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.preprocessing import RobustScaler, StandardScaler
@@ -24,20 +28,23 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 import optuna
+from sklearn.metrics import roc_curve, auc  # 追加
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout,
     QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QTableWidget, QTableWidgetItem, QMessageBox,
     QGroupBox, QProgressBar, QFileDialog, QPlainTextEdit,
-    QComboBox
+    QComboBox, QTextEdit, QSplitter, QScrollArea
 )
-from PyQt6.QtGui import QPixmap, QImage
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PySide6.QtGui import QPixmap, QImage, QFont
+from PySide6.QtCore import Qt, QThread, Signal
 
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import ks_2samp  # Kolmogorov-Smirnov test
+from rdkit.Chem.MACCSkeys import GenMACCSKeys
+from rdkit.Chem.Draw import MolToImage
 
 
 @dataclass
@@ -78,26 +85,29 @@ class FeatureCache:
 class MolecularDescriptorCalculator:
     """分子記述子計算クラス + サイケデリックス特徴量"""
     def __init__(self) -> None:
-        from rdkit.Chem import Descriptors, Crippen, AllChem, MACCSkeys
-        
         self.descriptor_functions = {
-            'MolWt': Descriptors.MolWt,
-            'MolLogP': Crippen.MolLogP,
-            'NumHDonors': Descriptors.NumHDonors,
-            'NumHAcceptors': Descriptors.NumHAcceptors,
-            'NumRotatableBonds': Descriptors.NumRotatableBonds,
-            'NumAromaticRings': Descriptors.NumAromaticRings,
-            'TPSA': Descriptors.TPSA,
-            'FractionCSP3': Descriptors.FractionCSP3,
-            'LabuteASA': Descriptors.LabuteASA,
-            'BalabanJ': Descriptors.BalabanJ,
-            'BertzCT': Descriptors.BertzCT,
-            # 必要に応じて追加
+            'MolWt': MolWt,
+            'MolLogP': MolLogP,
+            'NumHDonors': NumHDonors,
+            'NumHAcceptors': NumHAcceptors,
+            'NumRotatableBonds': NumRotatableBonds,
+            'NumAromaticRings': rdMolDescriptors.CalcNumAromaticRings,
+            'TPSA': TPSA,
+            'FractionCSP3': FractionCSP3,
+            'LabuteASA': rdMolDescriptors.CalcLabuteASA,
+            'BalabanJ': BalabanJ,
+            'BertzCT': BertzCT,
+            'HeavyAtomCount': HeavyAtomCount,
+            'NumAliphaticRings': rdMolDescriptors.CalcNumAliphaticRings,
+            'NumSaturatedRings': rdMolDescriptors.CalcNumSaturatedRings,
+            'NumHeteroatoms': rdMolDescriptors.CalcNumHeteroatoms,
+            'RingCount': rdMolDescriptors.CalcNumRings,
+            'NumSpiroAtoms': rdMolDescriptors.CalcNumSpiroAtoms,
+            'NumBridgeheadAtoms': rdMolDescriptors.CalcNumBridgeheadAtoms,
         }
-
         self.fingerprint_functions = {
-            'ECFP4': partial(AllChem.GetMorganFingerprintAsBitVect, radius=2, nBits=1024),
-            'MACCS': MACCSkeys.GenMACCSKeys
+            'ECFP4': lambda mol: rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024),
+            'MACCS': lambda mol: GenMACCSKeys(mol)
         }
         # サイケデリックス特徴量SMARTSパターン
         self.psychedelic_patterns = {
@@ -107,6 +117,16 @@ class MolecularDescriptorCalculator:
             'MethoxyCount': Chem.MolFromSmarts('CO'),
             'HalogenCount': Chem.MolFromSmarts('[F,Cl,Br,I]'),
             'HasNNDimethyl': Chem.MolFromSmarts('N(C)C'),
+        }
+        # 受容体アゴニスト代表スキャフォールドSMARTS
+        self.scaffold_patterns = {
+            'DAT_Phenylethylamine': Chem.MolFromSmarts('NCCc1ccccc1'),
+            '5HT2A_Indole': Chem.MolFromSmarts('c1cc2c(cc1)[nH]c2'),
+            'CB1_Dibenzopyran': Chem.MolFromSmarts('c1cc2c(cc1)Cc3ccccc3C2'),
+            'CB2_Dibenzopyran': Chem.MolFromSmarts('c1cc2c(cc1)Cc3ccccc3C2'),
+            'MuOpioid_Morphinan': Chem.MolFromSmarts('C1CC[C@]23c4ccc(O)cc4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5'),
+            'DeltaOpioid_Enkephalin': Chem.MolFromSmarts('CC(C)C[C@H](N)C(=O)NCC(=O)N'),
+            'KappaOpioid_Cyclohexanecarboxamide': Chem.MolFromSmarts('C1CCCCC1C(=O)N'),
         }
 
     def calculate(self, mol: Chem.Mol) -> Optional[np.ndarray]:
@@ -129,19 +149,22 @@ class MolecularDescriptorCalculator:
 
             # サイケデリックス特徴量
             psychedelic_features = []
-            psychedelic_features.append(int(mol.HasSubstructMatch(self.psychedelic_patterns['HasIndole'])))
-            psychedelic_features.append(int(mol.HasSubstructMatch(self.psychedelic_patterns['HasTryptamine'])))
-            psychedelic_features.append(int(mol.HasSubstructMatch(self.psychedelic_patterns['HasPhenethylamine'])))
+            psychedelic_features.append(int(mol.HasSubstructMatch(self.psychedelic_patterns['HasIndole']) if self.psychedelic_patterns['HasIndole'] else 0))
+            psychedelic_features.append(int(mol.HasSubstructMatch(self.psychedelic_patterns['HasTryptamine']) if self.psychedelic_patterns['HasTryptamine'] else 0))
+            psychedelic_features.append(int(mol.HasSubstructMatch(self.psychedelic_patterns['HasPhenethylamine']) if self.psychedelic_patterns['HasPhenethylamine'] else 0))
             # メトキシ基数
-            methoxy_count = len(mol.GetSubstructMatches(self.psychedelic_patterns['MethoxyCount']))
+            methoxy_count = len(mol.GetSubstructMatches(self.psychedelic_patterns['MethoxyCount'])) if self.psychedelic_patterns['MethoxyCount'] else 0
             psychedelic_features.append(methoxy_count)
             # ハロゲン数
-            halogen_count = len(mol.GetSubstructMatches(self.psychedelic_patterns['HalogenCount']))
+            halogen_count = len(mol.GetSubstructMatches(self.psychedelic_patterns['HalogenCount'])) if self.psychedelic_patterns['HalogenCount'] else 0
             psychedelic_features.append(halogen_count)
             # N,N-ジメチルアミン基
-            psychedelic_features.append(int(mol.HasSubstructMatch(self.psychedelic_patterns['HasNNDimethyl'])))
+            psychedelic_features.append(int(mol.HasSubstructMatch(self.psychedelic_patterns['HasNNDimethyl']) if self.psychedelic_patterns['HasNNDimethyl'] else 0))
 
-            return np.array(descriptors + fingerprints + psychedelic_features)
+            # 受容体アゴニストスキャフォールド特徴量
+            scaffold_features = [int(mol.HasSubstructMatch(pat)) if pat is not None else 0 for pat in self.scaffold_patterns.values()]
+
+            return np.array(descriptors + fingerprints + psychedelic_features + scaffold_features)
 
         except Exception as e:
             logging.error(f"特徴量計算エラー: {e}", exc_info=True)
@@ -163,7 +186,8 @@ class MolecularDescriptorCalculator:
             'HasIndole', 'HasTryptamine', 'HasPhenethylamine',
             'MethoxyCount', 'HalogenCount', 'HasNNDimethyl'
         ]
-        return descriptor_names + fingerprint_names + psychedelic_names
+        scaffold_names = list(self.scaffold_patterns.keys())
+        return descriptor_names + fingerprint_names + psychedelic_names + scaffold_names
 
 
 class TransformerModel(nn.Module):
@@ -843,10 +867,10 @@ class DATPredictor:
 
 class TrainingThread(QThread):
     """学習進捗管理スレッド"""
-    progress = pyqtSignal(int)
-    status = pyqtSignal(str)
-    error = pyqtSignal(str)
-    finished = pyqtSignal(dict)
+    progress = Signal(int)
+    status = Signal(str)
+    error = Signal(str)
+    finished = Signal(dict)
 
     def __init__(self, predictor: DATPredictor, method: str = 'optuna', target_chembl_id: str = 'CHEMBL238') -> None:
         super().__init__()
@@ -921,9 +945,9 @@ class TrainingThread(QThread):
 
 class BatchPredictionThread(QThread):
     """バッチ予測管理スレッド"""
-    progress = pyqtSignal(int)
-    result = pyqtSignal(tuple)
-    error = pyqtSignal(str)
+    progress = Signal(int)
+    result = Signal(tuple)
+    error = Signal(str)
 
     def __init__(self, predictor: DATPredictor, smiles_list: List[str]) -> None:
         super().__init__()
@@ -950,12 +974,13 @@ class DATPredictorGUI(QMainWindow):
         self.predictor = predictor
         self.training_thread = None
         self.batch_thread = None
+        self.txgemma_agent = None
         self._init_ui()
 
     def _init_ui(self) -> None:
         """UIの初期化"""
-        self.setWindowTitle('DAT Activity Predictor')
-        self.setGeometry(100, 100, 1500, 900)
+        self.setWindowTitle('🧪 DAT Activity Predictor + TxGemma AI')
+        self.setGeometry(100, 100, 1800, 1000)
 
         # メインウィジェットとレイアウト
         main_widget = QWidget()
@@ -971,9 +996,12 @@ class DATPredictorGUI(QMainWindow):
         center_panel = self._create_prediction_panel()
         layout.addWidget(center_panel)
 
-        # 右パネル（可視化セクション）
+        # 右パネル（可視化 + TxGemma対話セクション）
         right_panel = self._create_visualization_panel()
         layout.addWidget(right_panel)
+        
+        # TxGemmaエージェントの初期化
+        self._init_txgemma_agent()
 
     def _create_training_panel(self) -> QGroupBox:
         """学習パネルの作成"""
@@ -986,6 +1014,11 @@ class DATPredictorGUI(QMainWindow):
         self.target_combo = QComboBox()
         self.target_combo.addItem('DAT (CHEMBL238)', 'CHEMBL238')
         self.target_combo.addItem('5HT2A (CHEMBL224)', 'CHEMBL224')
+        self.target_combo.addItem('CB1 (CHEMBL218)', 'CHEMBL218')
+        self.target_combo.addItem('CB2 (CHEMBL1861)', 'CHEMBL1861')
+        self.target_combo.addItem('μ-opioid (CHEMBL233)', 'CHEMBL233')
+        self.target_combo.addItem('δ-opioid (CHEMBL236)', 'CHEMBL236')
+        self.target_combo.addItem('κ-opioid (CHEMBL237)', 'CHEMBL237')
         target_layout.addWidget(target_label)
         target_layout.addWidget(self.target_combo)
         layout.addLayout(target_layout)
@@ -1097,23 +1130,290 @@ class DATPredictorGUI(QMainWindow):
 
     def _create_visualization_panel(self) -> QGroupBox:
         """可視化パネルの作成"""
-        group = QGroupBox("Visualization")
+        group = QGroupBox("Visualization & AI Chat")
         layout = QVBoxLayout()
+
+        # スプリッターで上下分割
+        splitter = QSplitter(Qt.Orientation.Vertical)
+        
+        # 上段：可視化セクション
+        viz_widget = QWidget()
+        viz_layout = QVBoxLayout()
+        viz_widget.setLayout(viz_layout)
 
         # 構造図表示
         self.structure_view = QLabel()
         self.structure_view.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.structure_view)
+        self.structure_view.setMinimumHeight(200)
+        viz_layout.addWidget(self.structure_view)
 
         # 分子記述子テーブル
         self.descriptor_table = QTableWidget()
         self.descriptor_table.setColumnCount(2)
         self.descriptor_table.setHorizontalHeaderLabels(['Descriptor', 'Value'])
         self.descriptor_table.horizontalHeader().setStretchLastSection(True)
-        layout.addWidget(self.descriptor_table)
+        self.descriptor_table.setMaximumHeight(150)
+        viz_layout.addWidget(self.descriptor_table)
+
+        # 特徴量重要度グラフボタン
+        self.feature_importance_btn = QPushButton('Show Feature Importances')
+        self.feature_importance_btn.clicked.connect(self.handle_show_feature_importances)
+        viz_layout.addWidget(self.feature_importance_btn)
+
+        # ROC AUCカーブ表示ボタン
+        self.roc_auc_btn = QPushButton('Show ROC AUC Curve')
+        self.roc_auc_btn.clicked.connect(self.handle_show_roc_auc)
+        viz_layout.addWidget(self.roc_auc_btn)
+
+        splitter.addWidget(viz_widget)
+
+        # 下段：TxGemma対話セクション
+        chat_widget = self._create_txgemma_chat_panel()
+        splitter.addWidget(chat_widget)
+
+        # スプリッターの比率設定（上40%、下60%）
+        splitter.setSizes([400, 600])
+        layout.addWidget(splitter)
 
         group.setLayout(layout)
         return group
+
+    def _create_txgemma_chat_panel(self) -> QWidget:
+        """TxGemma対話パネルの作成"""
+        widget = QWidget()
+        layout = QVBoxLayout()
+        widget.setLayout(layout)
+
+        # チャットヘッダー
+        header_layout = QHBoxLayout()
+        header_label = QLabel("🤖 TxGemma AI Assistant")
+        header_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        header_layout.addWidget(header_label)
+        
+        # モデル選択
+        self.model_combo = QComboBox()
+        self.model_combo.addItem("TxGemma-9B", "hf.co/lmstudio-community/txgemma-9b-chat-GGUF:Q6_K")
+        self.model_combo.addItem("Llama3.2-3B (軽量)", "llama3.2:3b")
+        header_layout.addWidget(QLabel("Model:"))
+        header_layout.addWidget(self.model_combo)
+        
+        # 接続ボタン
+        self.connect_btn = QPushButton("Connect")
+        self.connect_btn.clicked.connect(self._connect_txgemma)
+        header_layout.addWidget(self.connect_btn)
+        
+        layout.addLayout(header_layout)
+
+        # チャット履歴表示
+        self.chat_display = QTextEdit()
+        self.chat_display.setReadOnly(True)
+        self.chat_display.setMinimumHeight(300)
+        self.chat_display.setStyleSheet("""
+            QTextEdit {
+                background-color: #f8f9fa;
+                border: 1px solid #dee2e6;
+                border-radius: 5px;
+                padding: 10px;
+                font-family: 'Consolas', monospace;
+            }
+        """)
+        layout.addWidget(self.chat_display)
+
+        # 入力エリア
+        input_layout = QHBoxLayout()
+        
+        # クイックコマンドボタン
+        quick_btn_layout = QVBoxLayout()
+        self.quick_predict_btn = QPushButton("📊 Predict & Explain")
+        self.quick_predict_btn.clicked.connect(self._quick_predict_explain)
+        self.quick_predict_btn.setEnabled(False)
+        quick_btn_layout.addWidget(self.quick_predict_btn)
+        
+        self.quick_suggest_btn = QPushButton("🎯 Suggest Compounds")
+        self.quick_suggest_btn.clicked.connect(self._quick_suggest_compounds)
+        self.quick_suggest_btn.setEnabled(False)
+        quick_btn_layout.addWidget(self.quick_suggest_btn)
+        
+        self.quick_design_btn = QPushButton("🧬 Design Molecules")
+        self.quick_design_btn.clicked.connect(self._quick_design_molecules)
+        self.quick_design_btn.setEnabled(False)
+        quick_btn_layout.addWidget(self.quick_design_btn)
+        
+        input_layout.addLayout(quick_btn_layout)
+
+        # テキスト入力
+        text_input_layout = QVBoxLayout()
+        self.chat_input = QTextEdit()
+        self.chat_input.setMaximumHeight(80)
+        self.chat_input.setPlaceholderText("TxGemmaに質問してください...\n例: 'この分子のpIC50を予測して、理由を説明して: CC(C)Nc1ncnc2...'")
+        text_input_layout.addWidget(self.chat_input)
+        
+        # 送信ボタン
+        send_layout = QHBoxLayout()
+        self.send_btn = QPushButton("💬 Send")
+        self.send_btn.clicked.connect(self._send_chat_message)
+        self.send_btn.setEnabled(False)
+        send_layout.addWidget(self.send_btn)
+        
+        self.clear_chat_btn = QPushButton("🗑️ Clear")
+        self.clear_chat_btn.clicked.connect(self._clear_chat)
+        send_layout.addWidget(self.clear_chat_btn)
+        
+        text_input_layout.addLayout(send_layout)
+        input_layout.addLayout(text_input_layout)
+        
+        layout.addLayout(input_layout)
+
+        return widget
+
+    def _init_txgemma_agent(self) -> None:
+        """TxGemmaエージェントの初期化"""
+        try:
+            from src.llm.txgemma_agent import TxGemmaAgent
+            # デフォルトでTxGemma-9Bを使用
+            self.txgemma_agent = TxGemmaAgent(model_name="hf.co/lmstudio-community/txgemma-9b-chat-GGUF:Q6_K")
+            self._add_chat_message("🤖", "TxGemma AI Assistant initialized! Ready for drug discovery conversations.")
+            self.connect_btn.setText("Connected ✅")
+            self.connect_btn.setEnabled(False)
+            self.send_btn.setEnabled(True)
+            self.quick_predict_btn.setEnabled(True)
+            self.quick_suggest_btn.setEnabled(True)
+            self.quick_design_btn.setEnabled(True)
+        except ImportError:
+            self._add_chat_message("❌", "TxGemma agent not available. Please install ollama and pull the model.")
+        except Exception as e:
+            self._add_chat_message("❌", f"Failed to initialize TxGemma: {str(e)}")
+
+    def _connect_txgemma(self) -> None:
+        """TxGemmaに接続"""
+        try:
+            model_name = self.model_combo.currentData()
+            from src.llm.txgemma_agent import TxGemmaAgent
+            self.txgemma_agent = TxGemmaAgent(model_name=model_name)
+            self._add_chat_message("🤖", f"Connected to {model_name}! Ready for drug discovery conversations.")
+            self.connect_btn.setText("Connected ✅")
+            self.connect_btn.setEnabled(False)
+            self.send_btn.setEnabled(True)
+            self.quick_predict_btn.setEnabled(True)
+            self.quick_suggest_btn.setEnabled(True)
+            self.quick_design_btn.setEnabled(True)
+        except Exception as e:
+            self._add_chat_message("❌", f"Connection failed: {str(e)}")
+
+    def _add_chat_message(self, sender: str, message: str) -> None:
+        """チャットにメッセージを追加"""
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        
+        if sender == "🤖":
+            formatted_message = f'<div style="margin: 5px; padding: 8px; background-color: #e3f2fd; border-radius: 5px;">'
+            formatted_message += f'<b>{sender} TxGemma</b> <small>({timestamp})</small><br>'
+            formatted_message += f'{message}</div>'
+        elif sender == "👤":
+            formatted_message = f'<div style="margin: 5px; padding: 8px; background-color: #f3e5f5; border-radius: 5px;">'
+            formatted_message += f'<b>{sender} You</b> <small>({timestamp})</small><br>'
+            formatted_message += f'{message}</div>'
+        else:
+            formatted_message = f'<div style="margin: 5px; padding: 8px; background-color: #fff3e0; border-radius: 5px;">'
+            formatted_message += f'<b>{sender}</b> <small>({timestamp})</small><br>'
+            formatted_message += f'{message}</div>'
+        
+        self.chat_display.append(formatted_message)
+        self.chat_display.verticalScrollBar().setValue(
+            self.chat_display.verticalScrollBar().maximum()
+        )
+
+    def _send_chat_message(self) -> None:
+        """チャットメッセージを送信"""
+        message = self.chat_input.toPlainText().strip()
+        if not message or not self.txgemma_agent:
+            return
+        
+        self._add_chat_message("👤", message)
+        self.chat_input.clear()
+        
+        # TxGemmaに送信
+        try:
+            response = self.txgemma_agent.chat(
+                message,
+                system_prompt="You are an expert medicinal chemist specializing in CNS drug discovery. Provide scientifically accurate, concise advice."
+            )
+            self._add_chat_message("🤖", response)
+        except Exception as e:
+            self._add_chat_message("❌", f"Error: {str(e)}")
+
+    def _clear_chat(self) -> None:
+        """チャット履歴をクリア"""
+        self.chat_display.clear()
+        if self.txgemma_agent:
+            self.txgemma_agent.clear_history()
+        self._add_chat_message("🤖", "Chat history cleared. Ready for new conversation!")
+
+    def _quick_predict_explain(self) -> None:
+        """クイック予測・解説"""
+        smiles = self.smiles_input.text().strip()
+        if not smiles:
+            self._add_chat_message("❌", "Please enter a SMILES string first.")
+            return
+        
+        if not self.predictor.is_trained:
+            self._add_chat_message("❌", "Please train a model first.")
+            return
+        
+        try:
+            # 予測実行
+            prediction, confidence = self.predictor.predict(smiles)
+            if prediction is None:
+                self._add_chat_message("❌", "Prediction failed.")
+                return
+            
+            uncertainty = confidence.get('std', 0.0) if confidence else None
+            
+            # TxGemmaに解説を依頼
+            target = self.target_combo.currentText().split(' ')[0]  # "DAT (CHEMBL238)" -> "DAT"
+            response = self.txgemma_agent.predict_compound_pIC50(
+                smiles=smiles,
+                target=target,
+                prediction=prediction,
+                uncertainty=uncertainty
+            )
+            
+            self._add_chat_message("🤖", f"**Prediction Results:**\nSMILES: {smiles}\nPredicted pIC50: {prediction:.2f} ± {uncertainty:.2f}\n\n**Analysis:**\n{response}")
+            
+        except Exception as e:
+            self._add_chat_message("❌", f"Error: {str(e)}")
+
+    def _quick_suggest_compounds(self) -> None:
+        """クイック化合物提案"""
+        if not self.txgemma_agent:
+            return
+        
+        try:
+            target = self.target_combo.currentText().split(' ')[0]
+            response = self.txgemma_agent.chat(
+                f"Suggest 5 molecular structures (SMILES) to synthesize next for {target} inhibitor discovery. "
+                f"Focus on diverse scaffolds with high predicted activity. Explain the rationale for each suggestion.",
+                system_prompt="You are an expert medicinal chemist specializing in CNS drug discovery."
+            )
+            self._add_chat_message("🤖", f"**Active Learning Suggestions for {target}:**\n\n{response}")
+        except Exception as e:
+            self._add_chat_message("❌", f"Error: {str(e)}")
+
+    def _quick_design_molecules(self) -> None:
+        """クイック分子設計"""
+        if not self.txgemma_agent:
+            return
+        
+        try:
+            target = self.target_combo.currentText().split(' ')[0]
+            response = self.txgemma_agent.chat(
+                f"Design 3 novel molecular structures for {target} receptor. "
+                f"Provide SMILES if possible, design rationale, and expected advantages.",
+                system_prompt="You are an expert medicinal chemist specializing in CNS drug discovery."
+            )
+            self._add_chat_message("🤖", f"**Molecular Design for {target}:**\n\n{response}")
+        except Exception as e:
+            self._add_chat_message("❌", f"Error: {str(e)}")
 
     def handle_training(self) -> None:
         """学習処理の開始"""
@@ -1313,7 +1613,7 @@ class DATPredictorGUI(QMainWindow):
                 raise ValueError("無効なSMILES文字列です。")
 
             # 構造図の更新
-            img = Draw.MolToImage(mol)
+            img = MolToImage(mol)
             buffer = io.BytesIO()
             img.save(buffer, format='PNG')
             qimg = QImage.fromData(buffer.getvalue())
@@ -1345,6 +1645,57 @@ class DATPredictorGUI(QMainWindow):
         except Exception as e:
             QMessageBox.warning(self, 'Error', f"Display update failed: {str(e)}")
             logging.error(f"分子表示エラー: {e}", exc_info=True)
+
+    def handle_show_feature_importances(self):
+        """特徴量重要度グラフの表示"""
+        if not self.predictor.is_trained or self.predictor.importances is None:
+            QMessageBox.information(self, 'Info', 'モデルが学習されていないか、特徴量重要度が利用できません。')
+            return
+        import matplotlib.pyplot as plt
+        import numpy as np
+        # 上位20特徴量を表示
+        importances = self.predictor.importances
+        feature_names = self.predictor.feature_names
+        indices = np.argsort(importances)[::-1][:20]
+        plt.figure(figsize=(10, 6))
+        plt.barh([feature_names[i] for i in indices][::-1], importances[indices][::-1])
+        plt.xlabel('Importance')
+        plt.title('Top 20 Feature Importances')
+        plt.tight_layout()
+        plt.show()
+
+    def handle_show_roc_auc(self):
+        """ROC AUCカーブの表示"""
+        if not self.predictor.is_trained:
+            QMessageBox.information(self, 'Info', 'モデルが学習されていません。')
+            return
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from sklearn.metrics import roc_curve, auc
+
+        # pIC50の閾値で2値化（例: 7.0 以上をactive）
+        threshold = 7.0
+        y_train_true = (self.predictor.y_train >= threshold).astype(int)
+        y_test_true = (self.predictor.y_test >= threshold).astype(int)
+        y_train_pred = self.predictor.pipeline.predict(self.predictor.X_train)
+        y_test_pred = self.predictor.pipeline.predict(self.predictor.X_test)
+
+        # 予測値をそのままスコアとして使う
+        fpr_train, tpr_train, _ = roc_curve(y_train_true, y_train_pred)
+        fpr_test, tpr_test, _ = roc_curve(y_test_true, y_test_pred)
+        auc_train = auc(fpr_train, tpr_train)
+        auc_test = auc(fpr_test, tpr_test)
+
+        plt.figure(figsize=(8, 6))
+        plt.plot(fpr_train, tpr_train, label=f'Train ROC (AUC={auc_train:.2f})')
+        plt.plot(fpr_test, tpr_test, label=f'Test ROC (AUC={auc_test:.2f})')
+        plt.plot([0, 1], [0, 1], 'k--', label='Random')
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title(f'ROC AUC Curve (Threshold: pIC50≥{threshold})')
+        plt.legend(loc='lower right')
+        plt.tight_layout()
+        plt.show()
 
     def clear_cache(self) -> None:
         """キャッシュをクリアする"""
@@ -1442,7 +1793,27 @@ REFERENCE_COMPOUNDS = {
         'LSD': 'CN(C)C1CCC2=C1C3C(C2)C4=CC=CC=C4N3C',
         'DMT': 'CN(C)CCC1=CNC2=CC=CC=C12',
         'Psilocybin': 'COP(=O)(O)OCC1C2=CC=CC=C2NC1',
-    }
+    },
+    'CHEMBL218': {  # CB1
+        'WIN 55,212-2': 'CN1CC(C2=CC=CC=C2)C(C3=CC=CC=C3)C1',
+        'CP 55,940': 'CC(C)(C)C1=CC2=C(C=C1)C3CC(C2)C4=CC=CC=C4C3',
+    },
+    'CHEMBL1861': {  # CB2
+        'JWH-133': 'CC(C)C1=CC2=C(C=C1)C3CC(C2)C4=CC=CC=C4C3',
+        'HU-308': 'CC(C)C1=CC2=C(C=C1)C3CC(C2)C4=CC=CC=C4C3O',
+    },
+    'CHEMBL233': {  # μ-opioid
+        'Morphine': 'CN1CC[C@]23C4=C5C=CC(O)=C4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5',
+        'DAMGO': 'CC(C)C[C@H](NC(=O)[C@H](N)CCC(=O)NCC(=O)N)C(=O)NCC(=O)N',
+    },
+    'CHEMBL236': {  # δ-opioid
+        'DPDPE': 'CC(C)C[C@H](NC(=O)[C@H](N)CCC(=O)NCC(=O)N)C(=O)NCC(=O)N',
+        'SNC80': 'CC1=CC2=C(C=C1)C3CC(C2)C4=CC=CC=C4C3',
+    },
+    'CHEMBL237': {  # κ-opioid
+        'U-50488': 'CC1=CC2=C(C=C1)C3CC(C2)C4=CC=CC=C4C3N',
+        'Salvinorin A': 'CC1=CC2=C(C=C1)C3CC(C2)C4=CC=CC=C4C3OC(=O)C',
+    },
 }
 
 def get_reference_pIC50s(predictor, target_chembl_id):

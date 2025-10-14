@@ -1,120 +1,149 @@
-# hDATpIC50prediction
-transformerモデルを構築し、決定係数90　テストデータのR2は70でありまだまだ特徴量エンジニアリングが重要
-DAT活性予測器
-このプロジェクトは、分子記述子とフィンガープリントに基づいてドーパミントランスポーター（DAT）の活性を予測するためのグラフィカルユーザーインターフェイス（GUI）アプリケーションです。SMILES表記から化合物のpIC50値を予測するために、Transformerベースのニューラルネットワークモデルなどの機械学習技術を活用しています。
+# hDAT pIC50 Prediction System
 
-特徴
-モデル学習: ChEMBLから取得したデータを使用して、Transformerベースのモデルを学習します。
-ハイパーパラメータ最適化: Optunaを使用してモデルのハイパーパラメータを最適化します。
-単一予測: SMILES文字列を入力して、単一の化合物のpIC50値を予測します。
-バッチ予測: 複数の化合物のpIC50値を一度に予測します。
-可視化: 分子構造と分子記述子を表示します。
-キャッシュ: 計算された分子特徴量をキャッシュして、処理を高速化します。
-インストール
-必要条件
-Python 3.7以上
-依存ライブラリのインストール
-以下のコマンドを使用して、必要なPythonライブラリをインストールします。
+---
 
-bash
-コードをコピーする
-pip install -r requirements.txt
-注意: 一部のライブラリは追加のシステム依存関係を必要とする場合があります。
+## 概要
+本リポジトリは、7つの分子ターゲット（DAT, 5HT2A, CB1, CB2, μ/δ/κ-opioid）に対応した、分子構造（SMILES）からpIC50値をTransformerベースの深層学習モデルで予測するシステムです。
 
-RDKit: RDKitが正しくインストールされていることを確認してください。問題が発生した場合は、RDKitのインストールガイドを参照してください。
-PyQt5: PyQt5はC++コンパイラを必要とする場合があります。Windowsではpip経由でインストールできます。macOSやLinuxでも同様です。
-使用方法
-リポジトリのクローンまたはダウンロード
+- **分子特徴量**: RDKit記述子、ECFP4/MACCSフィンガープリント、サイケデリックスSMARTS特徴量、アゴニストスキャフォールド
+- **モデル**: PyTorch LightningによるTransformer回帰
+- **CLI/GUI**: Typer CLIとPySide6 GUI両対応
+- **電源断保護**: 自動保存・キャッシュ・チェックポイント
+- **RTX3080等CUDA対応**
 
-提供されたコードをdat_predictor.pyというファイル名で保存してください。
+---
 
-アプリケーションの実行
+## 背景・目的
 
-bash
-コードをコピーする
-python dat_predictor.py
-GUIの操作
+創薬・化学分野では、分子の生物活性（pIC50等）予測は新規化合物設計・スクリーニングの要。特に多ターゲット（DAT, 5HT2A, CB1, CB2, オピオイド）に対し、
+- **分子記述子の多様性**
+- **深層学習による表現学習**
+- **ターゲットごとの代表スキャフォールド考慮**
+を組み合わせることで、従来法より高精度な予測を目指します。
 
-モデル学習
+---
 
-Train Modelボタンをクリックして、デフォルトのパラメータでモデルを学習します。
-**Optimize (Optuna)**ボタンをクリックして、ハイパーパラメータの最適化を行います。
-単一予測
+## 特徴量設計
 
-Single Predictionセクションで、化合物のSMILES文字列を入力します。
-Predictボタンをクリックして、予測されたpIC50値と分子記述子を表示します。
-バッチ予測
+- **RDKit分子記述子**: MolWt, LogP, TPSA, NumHDonors, NumHAcceptors, RotatableBonds, AromaticRings, FractionCSP3, LabuteASA, BalabanJ, BertzCT, HeavyAtomCount, など
+- **フィンガープリント**: ECFP4 (1024bit), MACCS (167bit)
+- **サイケデリックスSMARTS特徴量**: インドール環, トリプタミン, フェネチルアミン, メトキシ基数, ハロゲン数, N,N-ジメチルアミン基
+- **アゴニストスキャフォールド**: ターゲットごとに代表的なSMARTSパターンを付与
+- **相関除去**: 高相関特徴量は自動除去
 
-Batch Predictionセクションで、複数のSMILES文字列を1行ずつ入力します。
-Predict Batchボタンをクリックして、すべての入力化合物の予測を実行します。
-Export Resultsボタンをクリックして、予測結果をCSVファイルに保存します。
-可視化
+---
 
-単一予測時に、分子構造と分子記述子が表示されます。
-キャッシュ管理
+## モデル構造
 
-Clear Cacheボタンをクリックして、キャッシュされた分子特徴量を削除します。
+- **入力層**: 分子特徴量ベクトル
+- **埋め込み層**: Linear(input_dim→256)
+- **Transformer Encoder**: 2層, 4ヘッド, 256次元（Optunaで最適化可）
+- **グローバルプーリング**: 平均
+- **出力層**: Linear(256→1)
+- **損失関数**: MSELoss
+- **最適化**: Adam, 学習率スケジューラ, 早期停止
+- **クロスバリデーション/Optuna最適化対応**
 
-## CLIの使用
-コマンドラインから予測を実行する簡単なインターフェースを追加しました。
+---
 
-### 単一予測の例
-```bash
-python cli.py predict --model models/dat_transformer_model.pt --smiles "CCO"
+## ディレクトリ構成
+```
+├── src/                # メインモジュール（train.py, predict.py など）
+├── models/             # 学習済みモデル
+├── tests/              # テストコード
+├── _docs/              # 実装ログ・要件定義
+├── cli.py              # CLIエントリポイント
+├── main.py             # GUIエントリポイント
+├── dat_predictor.py    # コアロジック
+├── requirements.txt    # 依存パッケージ
+└── README.md           # 本ファイル
 ```
 
-### バッチ予測の例
-```bash
-python cli.py predict --model models/dat_transformer_model.pt --input smiles.txt
+---
+
+## 依存パッケージ
+- Python 3.10+
+- torch==2.3
+- pytorch-lightning==2.0
+- rdkit==2024.03
+- optuna==3.6
+- PySide6==6.5
+- tqdm
+- seaborn, matplotlib, pandas, scikit-learn
+
+`pip install -r requirements.txt` で一括インストール可能。
+
+---
+
+## 使い方
+
+### 1. CLI
+#### モデル学習
+```sh
+py -3 cli.py train --target CHEMBL238 --output models/dat_transformer_model.pt
 ```
+- `--target` : ChEMBLターゲットID（例: CHEMBL238=DAT, CHEMBL224=5HT2A, ...）
+- `--optimize` : Optunaによるハイパーパラメータ最適化
 
-プロジェクト構成
-dat_predictor.py: すべてのクラスとロジックを含むメインのアプリケーションスクリプト。
-.cache/: キャッシュされた分子特徴量を保存するディレクトリ。
-models/: 学習済みモデルを保存するディレクトリ。
-dat_predictor.log: アプリケーションの詳細なログを含むログファイル。
-モジュールとクラス
-ModelConfig: モデルと学習のパラメータを含む設定用のデータクラス。
-FeatureCache: 分子特徴量のキャッシュを管理します。
-MolecularDescriptorCalculator: 分子記述子とフィンガープリントを計算します。
-TransformerModel: Transformerベースのニューラルネットワークモデルを定義します。
-ModelPipeline: 学習、検証、予測のプロセスを管理します。
-DATPredictor: データ準備とモデルの処理を統括する高レベルのクラス。
-TrainingThread: GUIでのモデル学習を管理するQThread。
-BatchPredictionThread: GUIでのバッチ予測を処理するQThread。
-DATPredictorGUI: アプリケーションのメインGUIクラス。
-ロギング
-アプリケーションは詳細な情報とエラーをdat_predictor.logに記録します。これにはデータ取得、前処理ステップ、学習の進行状況、予測の詳細が含まれます。
+#### 予測
+```sh
+py -3 cli.py predict --model models/dat_transformer_model.pt --smiles "CC(CC1=CC=CC=C1)NC"
+```
+- `--input` : SMILESファイル（1行1分子）も可
 
-エラーハンドリング
-無効なSMILES入力: 無効なSMILES文字列が入力された場合、エラーメッセージが表示されます。
-モデル未学習: モデルの学習前に予測が試みられた場合、警告が表示されます。
-キャッシュの問題: キャッシュに関連するエラーはログに記録され、ユーザーに通知されます。
-依存関係のバージョン情報
-以下のバージョン以上を使用することを推奨します。
+### 2. GUI
+```sh
+py -3 main.py
+```
+- 学習・予測・バッチ予測・特徴量重要度グラフ・分布可視化など
 
-Python: 3.7+
-numpy: 1.18+
-pandas: 1.0+
-RDKit: 2020.03.1+
-scikit-learn: 0.22+
-torch: 1.4+
-optuna: 1.3+
-PyQt5: 5.14+
-matplotlib: 3.1+
-seaborn: 0.10+
-scipy: 1.4+
-トラブルシューティング
-RDKitのインポートエラー: RDKitが正しくインストールされていることを確認してください。RDKitのインストールガイドを参照してください。
-ModuleNotFoundError: モジュールが見つからない場合、すべての依存関係がインストールされ、最新であることを確認してください。
-アプリケーションのクラッシュ: 詳細なエラーメッセージについてはdat_predictor.logを確認してください。
-ライセンス
-このプロジェクトはMITライセンスの下で提供されています。
+---
 
-謝辞
-RDKit: オープンソースのケモインフォマティクスツールキット。
-ChEMBLデータベース: 創薬のためのオープンデータリソース。
-Optuna: ハイパーパラメータ最適化フレームワーク。
-お問い合わせ
-ご質問や問題がありましたら、[r.minegishi1987@gmail.com]までご連絡ください。
+## FAQ・トラブルシュート
+
+- **Q. CUDAが使われない/遅い**
+  - A. torch, pytorch-lightning, CUDA toolkit, GPUドライバのバージョンを確認。
+- **Q. RDKit記述子エラー**
+  - A. RDKitのバージョンとimport名を確認。
+- **Q. ChEMBLからデータが取得できない**
+  - A. chembl_webresource_clientのAPI制限やネットワークを確認。
+- **Q. GUIが起動しない**
+  - A. PySide6のバージョン、PyQt6との競合を確認。
+
+---
+
+## 開発指針・拡張例
+- 新規ターゲット追加：`REFERENCE_COMPOUNDS`/SMARTS/ChEMBL IDを追加
+- 特徴量追加：`MolecularDescriptorCalculator`に記述子関数を追加
+- モデル改良：アンサンブル/多層化/Attention可視化など
+- テスト追加：`tests/`配下にpytestでユニットテスト
+- 実装ログ：`_docs/`に日付+機能名で記録
+
+---
+
+## 参考文献・リンク
+- [ChEMBL](https://www.ebi.ac.uk/chembl/)
+- [RDKit](https://www.rdkit.org/)
+- [PyTorch](https://pytorch.org/)
+- [Optuna](https://optuna.org/)
+- [PySide6](https://doc.qt.io/qtforpython/)
+
+---
+
+## ライセンス
+MIT License
+
+---
+
+## 貢献
+- Issue/PR歓迎。新規ターゲット・特徴量・モデル改良・バグ修正など大歓迎。
+- コーディング規約: PEP8, 型ヒント, 実装ログ必須
+
+---
+
+## 更新履歴
+- 2024-06-09: リポジトリ整理・README刷新
+- 2024-06-01: GUI機能拡張・Optuna最適化追加
+- 2024-05-20: 多ターゲット対応・SMARTS特徴量追加
+- ...
 
