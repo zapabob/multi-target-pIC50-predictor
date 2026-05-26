@@ -1,5 +1,6 @@
 from rdkit import Chem
-from rdkit.Chem import Descriptors, Crippen
+from rdkit.Chem import Crippen, Descriptors
+
 
 def calc_descriptors(smiles):
     mol = Chem.MolFromSmiles(smiles)
@@ -10,8 +11,9 @@ def calc_descriptors(smiles):
         "LogP": Crippen.MolLogP(mol),
         "TPSA": Descriptors.TPSA(mol),
         "NumHDonors": Descriptors.NumHDonors(mol),
-        "NumHAcceptors": Descriptors.NumHAcceptors(mol)
+        "NumHAcceptors": Descriptors.NumHAcceptors(mol),
     }
+
 
 def predict_pIC50(desc, target):
     if target.lower() == "dat":
@@ -23,12 +25,15 @@ def predict_pIC50(desc, target):
     else:
         # fallback: 平均的な式
         a, b, c, d, e, bias = 0.2, -0.5, -0.3, -0.01, -0.001, 7.0
-    return (a * desc["LogP"] +
-            b * desc["NumHDonors"] +
-            c * desc["NumHAcceptors"] +
-            d * desc["TPSA"] +
-            e * desc["MolWt"] +
-            bias)
+    return (
+        a * desc["LogP"]
+        + b * desc["NumHDonors"]
+        + c * desc["NumHAcceptors"]
+        + d * desc["TPSA"]
+        + e * desc["MolWt"]
+        + bias
+    )
+
 
 if __name__ == "__main__":
     target = input("ターゲットを選択（DAT/5HT2A）: ").strip().lower()
@@ -43,4 +48,4 @@ if __name__ == "__main__":
         print(f"SMILES: {smiles}")
         print(f"Descriptors: {desc}")
         print(f"Predicted pIC50 ({target.upper()}): {pred:.2f}")
-        print("-" * 30) 
+        print("-" * 30)

@@ -1,0 +1,14 @@
+# Optional discovery workflow dependencies.
+#
+# Keep these outside requirements.txt because Airflow/Prefect can add a large
+# operational dependency surface. Install only for scheduled production runs.
+
+-r requirements.txt
+
+# Prefect orchestration for lightweight local/cloud flows
+prefect>=2.19.0
+
+# Airflow should be installed with the official constraints file that matches
+# your Python version and Airflow release:
+# https://airflow.apache.org/docs/apache-airflow/stable/installation/installing-from-pypi.html
+# apache-airflow>=2.9.0

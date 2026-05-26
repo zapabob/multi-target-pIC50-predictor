@@ -1,0 +1,8 @@
+# Airflow is intentionally managed separately from the normal UV sync because
+# the project should use the official Airflow constraints matching Python and
+# Airflow versions.
+#
+# Install with UV, for example on Python 3.12:
+# uv pip install "apache-airflow==2.10.5" --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.10.5/constraints-3.12.txt"
+
+apache-airflow==2.10.5

@@ -1,50 +1,66 @@
-import sys
-import os
-import io
-import pickle
-import logging
 import hashlib
-from pathlib import Path
-from datetime import datetime
+import io
+import logging
+import os
+import pickle
+import sys
 from dataclasses import dataclass
-from typing import Optional, Dict, List, Tuple
-from functools import partial
+from datetime import datetime
+from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
+import optuna
 import pandas as pd
-from rdkit import Chem
-from rdkit.Chem.Descriptors import MolWt, NumHDonors, NumHAcceptors, NumRotatableBonds, TPSA, FractionCSP3, BalabanJ, BertzCT, HeavyAtomCount
-from rdkit.Chem.Crippen import MolLogP
-from rdkit.Chem import rdMolDescriptors
-from rdkit.Chem.MACCSkeys import GenMACCSKeys
-from rdkit.Chem.Draw import MolToImage
-from chembl_webresource_client.new_client import new_client
-from sklearn.model_selection import train_test_split, KFold
-from sklearn.preprocessing import RobustScaler, StandardScaler
-from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.utils import resample
+import seaborn as sns
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from tqdm import tqdm
-import optuna
-from sklearn.metrics import roc_curve, auc  # 追加
-
-from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout,
-    QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QTableWidget, QTableWidgetItem, QMessageBox,
-    QGroupBox, QProgressBar, QFileDialog, QPlainTextEdit,
-    QComboBox, QTextEdit, QSplitter, QScrollArea
-)
-from PySide6.QtGui import QPixmap, QImage, QFont
+from chembl_webresource_client.new_client import new_client
 from PySide6.QtCore import Qt, QThread, Signal
-
-import matplotlib.pyplot as plt
-import seaborn as sns
-from scipy.stats import ks_2samp  # Kolmogorov-Smirnov test
-from rdkit.Chem.MACCSkeys import GenMACCSKeys
+from PySide6.QtGui import QFont, QImage, QPixmap
+from PySide6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QFileDialog,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMainWindow,
+    QMessageBox,
+    QPlainTextEdit,
+    QProgressBar,
+    QPushButton,
+    QSplitter,
+    QTableWidget,
+    QTableWidgetItem,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
+from rdkit import Chem
+from rdkit.Chem import rdMolDescriptors
+from rdkit.Chem.Crippen import MolLogP
+from rdkit.Chem.Descriptors import (
+    TPSA,
+    BalabanJ,
+    BertzCT,
+    FractionCSP3,
+    HeavyAtomCount,
+    MolWt,
+    NumHAcceptors,
+    NumHDonors,
+    NumRotatableBonds,
+)
 from rdkit.Chem.Draw import MolToImage
+from rdkit.Chem.MACCSkeys import GenMACCSKeys
+from scipy.stats import ks_2samp  # Kolmogorov-Smirnov test
+from sklearn.metrics import auc, r2_score, roc_curve  # 追加
+from sklearn.model_selection import KFold, train_test_split
+from sklearn.preprocessing import RobustScaler, StandardScaler
+from sklearn.utils import resample
+from tqdm import tqdm
 
 
 @dataclass
@@ -54,9 +70,9 @@ class ModelConfig:
     N_EPOCHS: int = 100
     BATCH_SIZE: int = 32
     LEARNING_RATE: float = 1e-3
-    CACHE_DIR: str = '.cache'
-    MODEL_DIR: str = 'models'
-    LOG_FILE: str = 'dat_predictor.log'
+    CACHE_DIR: str = ".cache"
+    MODEL_DIR: str = "models"
+    LOG_FILE: str = "dat_predictor.log"
     EARLY_STOPPING: bool = True
     PATIENCE: int = 10
     SCHEDULER: bool = True
@@ -64,6 +80,7 @@ class ModelConfig:
 
 class FeatureCache:
     """分子特徴量のキャッシュシステム"""
+
     def __init__(self, cache_dir: str):
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -71,10 +88,10 @@ class FeatureCache:
     def _get_cache_path(self, smiles: str) -> Path:
         return self.cache_dir / f"{hashlib.md5(smiles.encode()).hexdigest()}.npz"
 
-    def get(self, smiles: str) -> Optional[np.ndarray]:
+    def get(self, smiles: str) -> np.ndarray | None:
         cache_path = self._get_cache_path(smiles)
         if cache_path.exists():
-            return np.load(cache_path)['features']
+            return np.load(cache_path)["features"]
         return None
 
     def save(self, smiles: str, features: np.ndarray) -> None:
@@ -84,52 +101,55 @@ class FeatureCache:
 
 class MolecularDescriptorCalculator:
     """分子記述子計算クラス + サイケデリックス特徴量"""
+
     def __init__(self) -> None:
         self.descriptor_functions = {
-            'MolWt': MolWt,
-            'MolLogP': MolLogP,
-            'NumHDonors': NumHDonors,
-            'NumHAcceptors': NumHAcceptors,
-            'NumRotatableBonds': NumRotatableBonds,
-            'NumAromaticRings': rdMolDescriptors.CalcNumAromaticRings,
-            'TPSA': TPSA,
-            'FractionCSP3': FractionCSP3,
-            'LabuteASA': rdMolDescriptors.CalcLabuteASA,
-            'BalabanJ': BalabanJ,
-            'BertzCT': BertzCT,
-            'HeavyAtomCount': HeavyAtomCount,
-            'NumAliphaticRings': rdMolDescriptors.CalcNumAliphaticRings,
-            'NumSaturatedRings': rdMolDescriptors.CalcNumSaturatedRings,
-            'NumHeteroatoms': rdMolDescriptors.CalcNumHeteroatoms,
-            'RingCount': rdMolDescriptors.CalcNumRings,
-            'NumSpiroAtoms': rdMolDescriptors.CalcNumSpiroAtoms,
-            'NumBridgeheadAtoms': rdMolDescriptors.CalcNumBridgeheadAtoms,
+            "MolWt": MolWt,
+            "MolLogP": MolLogP,
+            "NumHDonors": NumHDonors,
+            "NumHAcceptors": NumHAcceptors,
+            "NumRotatableBonds": NumRotatableBonds,
+            "NumAromaticRings": rdMolDescriptors.CalcNumAromaticRings,
+            "TPSA": TPSA,
+            "FractionCSP3": FractionCSP3,
+            "LabuteASA": rdMolDescriptors.CalcLabuteASA,
+            "BalabanJ": BalabanJ,
+            "BertzCT": BertzCT,
+            "HeavyAtomCount": HeavyAtomCount,
+            "NumAliphaticRings": rdMolDescriptors.CalcNumAliphaticRings,
+            "NumSaturatedRings": rdMolDescriptors.CalcNumSaturatedRings,
+            "NumHeteroatoms": rdMolDescriptors.CalcNumHeteroatoms,
+            "RingCount": rdMolDescriptors.CalcNumRings,
+            "NumSpiroAtoms": rdMolDescriptors.CalcNumSpiroAtoms,
+            "NumBridgeheadAtoms": rdMolDescriptors.CalcNumBridgeheadAtoms,
         }
         self.fingerprint_functions = {
-            'ECFP4': lambda mol: rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024),
-            'MACCS': lambda mol: GenMACCSKeys(mol)
+            "ECFP4": lambda mol: rdMolDescriptors.GetMorganFingerprintAsBitVect(mol, 2, nBits=1024),
+            "MACCS": lambda mol: GenMACCSKeys(mol),
         }
         # サイケデリックス特徴量SMARTSパターン
         self.psychedelic_patterns = {
-            'HasIndole': Chem.MolFromSmarts('c1cc2c(cc1)[nH]c2'),
-            'HasTryptamine': Chem.MolFromSmarts('CCN(CC)CCC1=CNC2=CC=CC=C12'),
-            'HasPhenethylamine': Chem.MolFromSmarts('NCCc1ccc(O)cc1'),
-            'MethoxyCount': Chem.MolFromSmarts('CO'),
-            'HalogenCount': Chem.MolFromSmarts('[F,Cl,Br,I]'),
-            'HasNNDimethyl': Chem.MolFromSmarts('N(C)C'),
+            "HasIndole": Chem.MolFromSmarts("c1cc2c(cc1)[nH]c2"),
+            "HasTryptamine": Chem.MolFromSmarts("CCN(CC)CCC1=CNC2=CC=CC=C12"),
+            "HasPhenethylamine": Chem.MolFromSmarts("NCCc1ccc(O)cc1"),
+            "MethoxyCount": Chem.MolFromSmarts("CO"),
+            "HalogenCount": Chem.MolFromSmarts("[F,Cl,Br,I]"),
+            "HasNNDimethyl": Chem.MolFromSmarts("N(C)C"),
         }
         # 受容体アゴニスト代表スキャフォールドSMARTS
         self.scaffold_patterns = {
-            'DAT_Phenylethylamine': Chem.MolFromSmarts('NCCc1ccccc1'),
-            '5HT2A_Indole': Chem.MolFromSmarts('c1cc2c(cc1)[nH]c2'),
-            'CB1_Dibenzopyran': Chem.MolFromSmarts('c1cc2c(cc1)Cc3ccccc3C2'),
-            'CB2_Dibenzopyran': Chem.MolFromSmarts('c1cc2c(cc1)Cc3ccccc3C2'),
-            'MuOpioid_Morphinan': Chem.MolFromSmarts('C1CC[C@]23c4ccc(O)cc4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5'),
-            'DeltaOpioid_Enkephalin': Chem.MolFromSmarts('CC(C)C[C@H](N)C(=O)NCC(=O)N'),
-            'KappaOpioid_Cyclohexanecarboxamide': Chem.MolFromSmarts('C1CCCCC1C(=O)N'),
+            "DAT_Phenylethylamine": Chem.MolFromSmarts("NCCc1ccccc1"),
+            "5HT2A_Indole": Chem.MolFromSmarts("c1cc2c(cc1)[nH]c2"),
+            "CB1_Dibenzopyran": Chem.MolFromSmarts("c1cc2c(cc1)Cc3ccccc3C2"),
+            "CB2_Dibenzopyran": Chem.MolFromSmarts("c1cc2c(cc1)Cc3ccccc3C2"),
+            "MuOpioid_Morphinan": Chem.MolFromSmarts(
+                "C1CC[C@]23c4ccc(O)cc4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5"
+            ),
+            "DeltaOpioid_Enkephalin": Chem.MolFromSmarts("CC(C)C[C@H](N)C(=O)NCC(=O)N"),
+            "KappaOpioid_Cyclohexanecarboxamide": Chem.MolFromSmarts("C1CCCCC1C(=O)N"),
         }
 
-    def calculate(self, mol: Chem.Mol) -> Optional[np.ndarray]:
+    def calculate(self, mol: Chem.Mol) -> np.ndarray | None:
         """分子記述子とフィンガープリントを計算"""
         if mol is None:
             return None
@@ -140,29 +160,64 @@ class MolecularDescriptorCalculator:
 
             # フィンガープリントの計算
             fingerprints = []
-            for name, func in self.fingerprint_functions.items():
+            for _name, func in self.fingerprint_functions.items():
                 fp = func(mol)
-                if hasattr(fp, 'ToBitString'):
+                if hasattr(fp, "ToBitString"):
                     fingerprints.extend([int(b) for b in fp.ToBitString()])
                 else:
                     fingerprints.extend(fp)
 
             # サイケデリックス特徴量
             psychedelic_features = []
-            psychedelic_features.append(int(mol.HasSubstructMatch(self.psychedelic_patterns['HasIndole']) if self.psychedelic_patterns['HasIndole'] else 0))
-            psychedelic_features.append(int(mol.HasSubstructMatch(self.psychedelic_patterns['HasTryptamine']) if self.psychedelic_patterns['HasTryptamine'] else 0))
-            psychedelic_features.append(int(mol.HasSubstructMatch(self.psychedelic_patterns['HasPhenethylamine']) if self.psychedelic_patterns['HasPhenethylamine'] else 0))
+            psychedelic_features.append(
+                int(
+                    mol.HasSubstructMatch(self.psychedelic_patterns["HasIndole"])
+                    if self.psychedelic_patterns["HasIndole"]
+                    else 0
+                )
+            )
+            psychedelic_features.append(
+                int(
+                    mol.HasSubstructMatch(self.psychedelic_patterns["HasTryptamine"])
+                    if self.psychedelic_patterns["HasTryptamine"]
+                    else 0
+                )
+            )
+            psychedelic_features.append(
+                int(
+                    mol.HasSubstructMatch(self.psychedelic_patterns["HasPhenethylamine"])
+                    if self.psychedelic_patterns["HasPhenethylamine"]
+                    else 0
+                )
+            )
             # メトキシ基数
-            methoxy_count = len(mol.GetSubstructMatches(self.psychedelic_patterns['MethoxyCount'])) if self.psychedelic_patterns['MethoxyCount'] else 0
+            methoxy_count = (
+                len(mol.GetSubstructMatches(self.psychedelic_patterns["MethoxyCount"]))
+                if self.psychedelic_patterns["MethoxyCount"]
+                else 0
+            )
             psychedelic_features.append(methoxy_count)
             # ハロゲン数
-            halogen_count = len(mol.GetSubstructMatches(self.psychedelic_patterns['HalogenCount'])) if self.psychedelic_patterns['HalogenCount'] else 0
+            halogen_count = (
+                len(mol.GetSubstructMatches(self.psychedelic_patterns["HalogenCount"]))
+                if self.psychedelic_patterns["HalogenCount"]
+                else 0
+            )
             psychedelic_features.append(halogen_count)
             # N,N-ジメチルアミン基
-            psychedelic_features.append(int(mol.HasSubstructMatch(self.psychedelic_patterns['HasNNDimethyl']) if self.psychedelic_patterns['HasNNDimethyl'] else 0))
+            psychedelic_features.append(
+                int(
+                    mol.HasSubstructMatch(self.psychedelic_patterns["HasNNDimethyl"])
+                    if self.psychedelic_patterns["HasNNDimethyl"]
+                    else 0
+                )
+            )
 
             # 受容体アゴニストスキャフォールド特徴量
-            scaffold_features = [int(mol.HasSubstructMatch(pat)) if pat is not None else 0 for pat in self.scaffold_patterns.values()]
+            scaffold_features = [
+                int(mol.HasSubstructMatch(pat)) if pat is not None else 0
+                for pat in self.scaffold_patterns.values()
+            ]
 
             return np.array(descriptors + fingerprints + psychedelic_features + scaffold_features)
 
@@ -170,21 +225,25 @@ class MolecularDescriptorCalculator:
             logging.error(f"特徴量計算エラー: {e}", exc_info=True)
             return None
 
-    def get_feature_names(self) -> List[str]:
+    def get_feature_names(self) -> list[str]:
         """全特徴量名を取得"""
         descriptor_names = list(self.descriptor_functions.keys())
         fingerprint_names = []
         for name in self.fingerprint_functions.keys():
-            if name == 'ECFP4':
+            if name == "ECFP4":
                 n_bits = 1024
-            elif name == 'MACCS':
+            elif name == "MACCS":
                 n_bits = 167
             else:
                 n_bits = 0
             fingerprint_names.extend([f"{name}_{i}" for i in range(n_bits)])
         psychedelic_names = [
-            'HasIndole', 'HasTryptamine', 'HasPhenethylamine',
-            'MethoxyCount', 'HalogenCount', 'HasNNDimethyl'
+            "HasIndole",
+            "HasTryptamine",
+            "HasPhenethylamine",
+            "MethoxyCount",
+            "HalogenCount",
+            "HasNNDimethyl",
         ]
         scaffold_names = list(self.scaffold_patterns.keys())
         return descriptor_names + fingerprint_names + psychedelic_names + scaffold_names
@@ -192,10 +251,23 @@ class MolecularDescriptorCalculator:
 
 class TransformerModel(nn.Module):
     """Transformerベースのモデル"""
-    def __init__(self, input_dim: int, num_layers: int = 2, num_heads: int = 4, dim_feedforward: int = 256, dropout: float = 0.1):
-        super(TransformerModel, self).__init__()
+
+    def __init__(
+        self,
+        input_dim: int,
+        num_layers: int = 2,
+        num_heads: int = 4,
+        dim_feedforward: int = 256,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
         self.embedding = nn.Linear(input_dim, dim_feedforward)
-        encoder_layer = nn.TransformerEncoderLayer(d_model=dim_feedforward, nhead=num_heads, dim_feedforward=dim_feedforward, dropout=dropout)
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=dim_feedforward,
+            nhead=num_heads,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+        )
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
         self.fc_out = nn.Linear(dim_feedforward, 1)
 
@@ -209,31 +281,47 @@ class TransformerModel(nn.Module):
 
 class ModelPipeline:
     """モデルパイプライン"""
+
     def __init__(self, random_state: int = 42):
         self.random_state = random_state
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         self.scaler = RobustScaler()
         self.y_scaler = StandardScaler()
         self.model = None  # TransformerModel
-        self.model_type = 'transformer'
+        self.model_type = "transformer"
 
-    def fit(self, X: np.ndarray, y: np.ndarray, config: ModelConfig,
-            num_layers: int = 2, num_heads: int = 4, dim_feedforward: int = 256, dropout: float = 0.1,
-            weight_decay: float = 1e-5,
-            early_stopping: bool = False, patience: int = 10, scheduler: bool = False):
+    def fit(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        config: ModelConfig,
+        num_layers: int = 2,
+        num_heads: int = 4,
+        dim_feedforward: int = 256,
+        dropout: float = 0.1,
+        weight_decay: float = 1e-5,
+        early_stopping: bool = False,
+        patience: int = 10,
+        scheduler: bool = False,
+    ):
         """モデルの学習"""
         X = self.scaler.fit_transform(X)
         y = self.y_scaler.fit_transform(y.reshape(-1, 1)).flatten()
         input_dim = X.shape[1]
 
         # モデルの初期化
-        self.model = TransformerModel(input_dim, num_layers=num_layers, num_heads=num_heads, dim_feedforward=dim_feedforward, dropout=dropout).to(self.device)
+        self.model = TransformerModel(
+            input_dim,
+            num_layers=num_layers,
+            num_heads=num_heads,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+        ).to(self.device)
 
         # データセットの準備
         dataset = torch.utils.data.TensorDataset(
-            torch.tensor(X, dtype=torch.float32),
-            torch.tensor(y, dtype=torch.float32).unsqueeze(1)
+            torch.tensor(X, dtype=torch.float32), torch.tensor(y, dtype=torch.float32).unsqueeze(1)
         )
         dataloader = torch.utils.data.DataLoader(
             dataset, batch_size=config.BATCH_SIZE, shuffle=True
@@ -241,7 +329,9 @@ class ModelPipeline:
 
         # 損失関数と最適化手法
         criterion = nn.MSELoss()
-        optimizer = optim.Adam(self.model.parameters(), lr=config.LEARNING_RATE, weight_decay=weight_decay)
+        optimizer = optim.Adam(
+            self.model.parameters(), lr=config.LEARNING_RATE, weight_decay=weight_decay
+        )
 
         # 学習率スケジューラの設定
         if scheduler:
@@ -249,7 +339,7 @@ class ModelPipeline:
 
         # 学習ループ
         self.model.train()
-        best_loss = float('inf')
+        best_loss = float("inf")
         epochs_no_improve = 0
 
         train_losses = []  # 学習曲線用
@@ -267,7 +357,7 @@ class ModelPipeline:
                 epoch_loss += loss.item() * batch_X.size(0)
             avg_loss = epoch_loss / len(dataset)
             train_losses.append(avg_loss)
-            logging.info(f"Epoch [{epoch+1}/{config.N_EPOCHS}], Loss: {avg_loss:.4f}")
+            logging.info(f"Epoch [{epoch + 1}/{config.N_EPOCHS}], Loss: {avg_loss:.4f}")
 
             # 学習率スケジューラのステップ
             if scheduler:
@@ -279,7 +369,7 @@ class ModelPipeline:
                     best_loss = avg_loss
                     epochs_no_improve = 0
                     # ベストモデルを保存
-                    torch.save(self.model.state_dict(), 'best_model.pt')
+                    torch.save(self.model.state_dict(), "best_model.pt")
                 else:
                     epochs_no_improve += 1
                     if epochs_no_improve >= patience:
@@ -287,30 +377,39 @@ class ModelPipeline:
                         break
 
         # 早期停止後、ベストモデルをロード
-        if early_stopping and os.path.exists('best_model.pt'):
-            self.model.load_state_dict(torch.load('best_model.pt'))
-            os.remove('best_model.pt')
+        if early_stopping and os.path.exists("best_model.pt"):
+            self.model.load_state_dict(torch.load("best_model.pt"))
+            os.remove("best_model.pt")
 
         # 学習曲線をプロット
         plt.figure(figsize=(10, 6))
-        plt.plot(train_losses, label='Training Loss')
-        plt.title('Learning Curve')
-        plt.xlabel('Epoch')
-        plt.ylabel('Loss')
+        plt.plot(train_losses, label="Training Loss")
+        plt.title("Learning Curve")
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
         plt.legend()
-        plt.savefig('learning_curve.png')
+        plt.savefig("learning_curve.png")
         plt.close()
         logging.info("学習曲線を保存しました: learning_curve.png")
 
-    def cross_validate(self, X: np.ndarray, y: np.ndarray, config: ModelConfig, n_splits: int = 3,
-                       num_layers: int = 2, num_heads: int = 4, dim_feedforward: int = 256, dropout: float = 0.1,
-                       weight_decay: float = 1e-5) -> float:
+    def cross_validate(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        config: ModelConfig,
+        n_splits: int = 3,
+        num_layers: int = 2,
+        num_heads: int = 4,
+        dim_feedforward: int = 256,
+        dropout: float = 0.1,
+        weight_decay: float = 1e-5,
+    ) -> float:
         """K-Foldクロスバリデーション"""
         kf = KFold(n_splits=n_splits, shuffle=True, random_state=self.random_state)
         scores = []
 
         for fold, (train_index, val_index) in enumerate(kf.split(X)):
-            logging.info(f"Fold {fold+1}/{n_splits}")
+            logging.info(f"Fold {fold + 1}/{n_splits}")
             X_train, X_val = X[train_index], X[val_index]
             y_train, y_val = y[train_index], y[val_index]
 
@@ -326,12 +425,18 @@ class ModelPipeline:
             input_dim = X_train_scaled.shape[1]
 
             # モデルの初期化
-            model = TransformerModel(input_dim, num_layers=num_layers, num_heads=num_heads, dim_feedforward=dim_feedforward, dropout=dropout).to(self.device)
+            model = TransformerModel(
+                input_dim,
+                num_layers=num_layers,
+                num_heads=num_heads,
+                dim_feedforward=dim_feedforward,
+                dropout=dropout,
+            ).to(self.device)
 
             # データセットの準備
             dataset = torch.utils.data.TensorDataset(
                 torch.tensor(X_train_scaled, dtype=torch.float32),
-                torch.tensor(y_train_scaled, dtype=torch.float32).unsqueeze(1)
+                torch.tensor(y_train_scaled, dtype=torch.float32).unsqueeze(1),
             )
             dataloader = torch.utils.data.DataLoader(
                 dataset, batch_size=config.BATCH_SIZE, shuffle=True
@@ -339,11 +444,13 @@ class ModelPipeline:
 
             # 損失関数と最適化手法
             criterion = nn.MSELoss()
-            optimizer = optim.Adam(model.parameters(), lr=config.LEARNING_RATE, weight_decay=weight_decay)
+            optimizer = optim.Adam(
+                model.parameters(), lr=config.LEARNING_RATE, weight_decay=weight_decay
+            )
 
             # 学習ループ
             model.train()
-            best_loss = float('inf')
+            best_loss = float("inf")
             epochs_no_improve = 0
             patience = config.PATIENCE  # 早期停止のパラメータ
 
@@ -360,14 +467,16 @@ class ModelPipeline:
 
                     epoch_loss += loss.item() * batch_X.size(0)
                 avg_loss = epoch_loss / len(dataset)
-                logging.info(f"Fold {fold+1}, Epoch [{epoch+1}/{config.N_EPOCHS}], Loss: {avg_loss:.4f}")
+                logging.info(
+                    f"Fold {fold + 1}, Epoch [{epoch + 1}/{config.N_EPOCHS}], Loss: {avg_loss:.4f}"
+                )
 
                 # 早期停止のチェック
                 if avg_loss < best_loss:
                     best_loss = avg_loss
                     epochs_no_improve = 0
                     # ベストモデルを保存
-                    torch.save(model.state_dict(), 'fold_best_model.pt')
+                    torch.save(model.state_dict(), "fold_best_model.pt")
                 else:
                     epochs_no_improve += 1
                     if epochs_no_improve >= patience:
@@ -375,9 +484,9 @@ class ModelPipeline:
                         break
 
             # ベストモデルのロード
-            if os.path.exists('fold_best_model.pt'):
-                model.load_state_dict(torch.load('fold_best_model.pt'))
-                os.remove('fold_best_model.pt')
+            if os.path.exists("fold_best_model.pt"):
+                model.load_state_dict(torch.load("fold_best_model.pt"))
+                os.remove("fold_best_model.pt")
 
             # 検証セットでの評価
             model.eval()
@@ -385,7 +494,7 @@ class ModelPipeline:
                 inputs = torch.tensor(X_val_scaled, dtype=torch.float32).to(self.device)
                 outputs = model(inputs).cpu().numpy().flatten()
                 score = r2_score(y_val_scaled, outputs)
-                logging.info(f"Fold {fold+1} R2 Score: {score:.4f}")
+                logging.info(f"Fold {fold + 1} R2 Score: {score:.4f}")
                 scores.append(score)
 
         mean_score = np.mean(scores)
@@ -407,7 +516,8 @@ class ModelPipeline:
 
 class DATPredictor:
     """DAT活性予測モデル"""
-    def __init__(self, config: Optional[ModelConfig] = None) -> None:
+
+    def __init__(self, config: ModelConfig | None = None) -> None:
         self.config = config or ModelConfig()
         self.descriptor_calculator = MolecularDescriptorCalculator()
         self.pipeline = ModelPipeline(random_state=self.config.RANDOM_SEED)
@@ -415,7 +525,7 @@ class DATPredictor:
         self.is_trained = False
         self._setup_logging()
         self.importances = None  # 特徴量重要度
-        self.model_type = 'transformer'  # 'transformer' をデフォルトに設定
+        self.model_type = "transformer"  # 'transformer' をデフォルトに設定
         self.removed_features = []  # 削除された特徴量名を保存
         self.feature_names = []  # 使用する特徴量名を保存
         self.full_feature_names = []  # 全特徴量名を保存
@@ -425,26 +535,26 @@ class DATPredictor:
         """ロギング設定"""
         logger = logging.getLogger()
         logger.setLevel(logging.INFO)
-        
-        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
-        
+
+        formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+
         # FileHandler with utf-8 encoding
-        file_handler = logging.FileHandler(self.config.LOG_FILE, encoding='utf-8')
+        file_handler = logging.FileHandler(self.config.LOG_FILE, encoding="utf-8")
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
-        
+
         # StreamHandler with utf-8 encoding
         stream_handler = logging.StreamHandler(sys.stdout)
         stream_handler.setFormatter(formatter)
         stream_handler.setLevel(logging.INFO)
         logger.addHandler(stream_handler)
 
-    def fetch_data(self, target_chembl_id: str = 'CHEMBL238') -> pd.DataFrame:
+    def fetch_data(self, target_chembl_id: str = "CHEMBL238") -> pd.DataFrame:
         """ChEMBLからのデータ取得（ターゲットID指定可）"""
-        cache_path = Path(self.config.CACHE_DIR) / f'chembl_data_{target_chembl_id}.pkl'
+        cache_path = Path(self.config.CACHE_DIR) / f"chembl_data_{target_chembl_id}.pkl"
         try:
             if cache_path.exists():
-                with open(cache_path, 'rb') as f:
+                with open(cache_path, "rb") as f:
                     df = pickle.load(f)
                 logging.info("キャッシュからデータを読み込みました")
                 return df
@@ -452,19 +562,17 @@ class DATPredictor:
             activity = new_client.activity
             dat = target.filter(target_chembl_id=target_chembl_id)[0]
             activities = activity.filter(
-                target_chembl_id=dat['target_chembl_id'],
-                standard_type="IC50",
-                standard_units="nM"
+                target_chembl_id=dat["target_chembl_id"], standard_type="IC50", standard_units="nM"
             )
             df = pd.DataFrame(activities)
-            if 'standard_value' in df.columns:
-                df['standard_value'] = pd.to_numeric(df['standard_value'], errors='coerce')
+            if "standard_value" in df.columns:
+                df["standard_value"] = pd.to_numeric(df["standard_value"], errors="coerce")
             if df.empty:
                 raise ValueError("データが取得できませんでした")
-            result_df = df[['molecule_chembl_id', 'canonical_smiles', 'standard_value']].dropna()
-            result_df = result_df[result_df['standard_value'] < 1_000_000]
+            result_df = df[["molecule_chembl_id", "canonical_smiles", "standard_value"]].dropna()
+            result_df = result_df[result_df["standard_value"] < 1_000_000]
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(cache_path, 'wb') as f:
+            with open(cache_path, "wb") as f:
                 pickle.dump(result_df, f)
             logging.info(f"ChEMBL({target_chembl_id})から{len(result_df)}件のデータを取得しました")
             return result_df
@@ -479,10 +587,10 @@ class DATPredictor:
                 raise ValueError("入力データが空です")
 
             # pIC50の計算
-            df['pIC50'] = -np.log10(df['standard_value'].values * 1e-9)
+            df["pIC50"] = -np.log10(df["standard_value"].values * 1e-9)
 
             # 全てのSMILESを取得
-            smiles_list = df['canonical_smiles'].tolist()
+            smiles_list = df["canonical_smiles"].tolist()
 
             # キャッシュされていないSMILESを特定
             uncached_smiles = [smiles for smiles in smiles_list if self.cache.get(smiles) is None]
@@ -511,7 +619,7 @@ class DATPredictor:
                 raise ValueError("有効なデータがありません")
 
             self.X = np.vstack(descriptors)
-            self.y = df['pIC50'].values[valid_indices]
+            self.y = df["pIC50"].values[valid_indices]
 
             # 特徴量名を設定
             self.feature_names = self.descriptor_calculator.get_feature_names()
@@ -523,9 +631,10 @@ class DATPredictor:
 
             # データ分割
             self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(
-                self.X, self.y,
+                self.X,
+                self.y,
                 test_size=self.config.TEST_SIZE,
-                random_state=self.config.RANDOM_SEED
+                random_state=self.config.RANDOM_SEED,
             )
 
             logging.info(f"データ前処理完了: {len(self.X)}件の有効データ")
@@ -545,22 +654,26 @@ class DATPredictor:
         try:
             # 分布を可視化（オプション：GUI外で保存するなど）
             plt.figure(figsize=(10, 6))
-            sns.kdeplot(self.y_train, label='Train')
-            sns.kdeplot(self.y_test, label='Test')
-            plt.title('Distribution of pIC50 in Train and Test Sets')
-            plt.xlabel('pIC50')
-            plt.ylabel('Density')
+            sns.kdeplot(self.y_train, label="Train")
+            sns.kdeplot(self.y_test, label="Test")
+            plt.title("Distribution of pIC50 in Train and Test Sets")
+            plt.xlabel("pIC50")
+            plt.ylabel("Density")
             plt.legend()
-            plt.savefig('distribution_comparison.png')
+            plt.savefig("distribution_comparison.png")
             plt.close()
             logging.info("分布比較プロットを保存しました: distribution_comparison.png")
 
             # 統計的に分布が異なるか検定（Kolmogorov-Smirnov test）
             ks_stat, p_value = ks_2samp(self.y_train, self.y_test)
-            logging.info(f"Kolmogorov-Smirnov test statistic: {ks_stat:.4f}, p-value: {p_value:.4f}")
+            logging.info(
+                f"Kolmogorov-Smirnov test statistic: {ks_stat:.4f}, p-value: {p_value:.4f}"
+            )
 
             if p_value < 0.05:
-                logging.warning("学習データとテストデータの分布が統計的に有意に異なります。リサンプリングを行います。")
+                logging.warning(
+                    "学習データとテストデータの分布が統計的に有意に異なります。リサンプリングを行います。"
+                )
                 self._resample_data()
 
         except Exception as e:
@@ -572,40 +685,45 @@ class DATPredictor:
             # ターゲット変数をビニングしてカテゴリカル変数に変換
             num_bins = 10
             y_train_binned = pd.cut(self.y_train, bins=num_bins, labels=False)
-            y_test_binned = pd.cut(self.y_test, bins=num_bins, labels=False)
-
             # リサンプリング（アンダーサンプリング）
             df_train = pd.DataFrame(self.X_train, columns=self.feature_names)
-            df_train['y'] = self.y_train
-            df_train['y_bin'] = y_train_binned
+            df_train["y"] = self.y_train
+            df_train["y_bin"] = y_train_binned
 
             # 各ビンの最小サンプル数を決定
-            bin_counts = df_train['y_bin'].value_counts()
+            bin_counts = df_train["y_bin"].value_counts()
             min_count = bin_counts.min()
 
             # 各ビンからランダムにサンプルを抽出
             df_resampled = pd.DataFrame()
             for bin_label in bin_counts.index:
-                bin_data = df_train[df_train['y_bin'] == bin_label]
-                bin_resampled = resample(bin_data, replace=False, n_samples=min_count, random_state=self.config.RANDOM_SEED)
+                bin_data = df_train[df_train["y_bin"] == bin_label]
+                bin_resampled = resample(
+                    bin_data,
+                    replace=False,
+                    n_samples=min_count,
+                    random_state=self.config.RANDOM_SEED,
+                )
                 df_resampled = pd.concat([df_resampled, bin_resampled], axis=0)
 
-            self.X_train = df_resampled.drop(['y', 'y_bin'], axis=1).values
-            self.y_train = df_resampled['y'].values
+            self.X_train = df_resampled.drop(["y", "y_bin"], axis=1).values
+            self.y_train = df_resampled["y"].values
 
             logging.info(f"リサンプリング後の学習データサイズ: {self.X_train.shape[0]}")
 
             # 再度分布を確認
             plt.figure(figsize=(10, 6))
-            sns.kdeplot(self.y_train, label='Resampled Train')
-            sns.kdeplot(self.y_test, label='Test')
-            plt.title('Distribution of pIC50 after Resampling')
-            plt.xlabel('pIC50')
-            plt.ylabel('Density')
+            sns.kdeplot(self.y_train, label="Resampled Train")
+            sns.kdeplot(self.y_test, label="Test")
+            plt.title("Distribution of pIC50 after Resampling")
+            plt.xlabel("pIC50")
+            plt.ylabel("Density")
             plt.legend()
-            plt.savefig('distribution_comparison_resampled.png')
+            plt.savefig("distribution_comparison_resampled.png")
             plt.close()
-            logging.info("リサンプリング後の分布比較プロットを保存しました: distribution_comparison_resampled.png")
+            logging.info(
+                "リサンプリング後の分布比較プロットを保存しました: distribution_comparison_resampled.png"
+            )
 
         except Exception as e:
             logging.error(f"リサンプリングエラー: {e}", exc_info=True)
@@ -630,7 +748,9 @@ class DATPredictor:
             self.feature_names = df_reduced.columns.tolist()
 
             # 特徴量のインデックスを保存
-            self.feature_indices = df_reduced.columns.map(lambda x: self.full_feature_names.index(x)).tolist()
+            self.feature_indices = df_reduced.columns.map(
+                lambda x: self.full_feature_names.index(x)
+            ).tolist()
 
         except Exception as e:
             logging.error(f"相関の高い特徴量の削除エラー: {e}", exc_info=True)
@@ -639,6 +759,7 @@ class DATPredictor:
         """特徴量の重要度を分析"""
         try:
             from sklearn.ensemble import RandomForestRegressor
+
             rf = RandomForestRegressor(random_state=self.config.RANDOM_SEED)
             rf.fit(self.X_train, self.y_train)
             self.importances = rf.feature_importances_
@@ -650,15 +771,21 @@ class DATPredictor:
             logging.info("Feature importances (top 20):")
             for f in range(top_n):
                 if f < len(indices):
-                    logging.info(f"{f + 1}. {feature_names[indices[f]]} ({self.importances[indices[f]]:.4f})")
+                    logging.info(
+                        f"{f + 1}. {feature_names[indices[f]]} ({self.importances[indices[f]]:.4f})"
+                    )
         except Exception as e:
             logging.error(f"特徴量重要度の分析エラー: {e}", exc_info=True)
 
-    def train_model(self, early_stopping: bool = False, patience: int = 10, scheduler: bool = False) -> None:
+    def train_model(
+        self, early_stopping: bool = False, patience: int = 10, scheduler: bool = False
+    ) -> None:
         """モデル学習"""
         try:
             self.pipeline.fit(
-                self.X_train, self.y_train, self.config,
+                self.X_train,
+                self.y_train,
+                self.config,
                 num_layers=2,
                 num_heads=4,
                 dim_feedforward=256,
@@ -666,7 +793,7 @@ class DATPredictor:
                 weight_decay=1e-4,
                 early_stopping=early_stopping,
                 patience=patience,
-                scheduler=scheduler
+                scheduler=scheduler,
             )
             self.is_trained = True
             logging.info(f"モデル学習完了（{self.model_type}）")
@@ -677,68 +804,72 @@ class DATPredictor:
 
     def cross_validate_model(self) -> float:
         """モデルのクロスバリデーション"""
-        return self.pipeline.cross_validate(
-            self.X_train, self.y_train, self.config
-        )
+        return self.pipeline.cross_validate(self.X_train, self.y_train, self.config)
 
     def optimize_hyperparameters(self, n_trials: int = 20) -> None:
         """ハイパーパラメータ最適化（Optuna）"""
         try:
+
             def objective(trial):
                 # ハイパーパラメータの提案
-                learning_rate = trial.suggest_loguniform('learning_rate', 1e-5, 1e-3)
-                batch_size = trial.suggest_categorical('batch_size', [32, 64])
-                dropout = trial.suggest_uniform('dropout', 0.1, 0.3)
-                weight_decay = trial.suggest_loguniform('weight_decay', 1e-6, 1e-4)
-                num_layers = trial.suggest_int('num_layers', 1, 3)
-                num_heads = trial.suggest_categorical('num_heads', [2, 4, 8])
-                dim_feedforward = trial.suggest_categorical('dim_feedforward', [128, 256, 512])
+                learning_rate = trial.suggest_loguniform("learning_rate", 1e-5, 1e-3)
+                batch_size = trial.suggest_categorical("batch_size", [32, 64])
+                dropout = trial.suggest_uniform("dropout", 0.1, 0.3)
+                weight_decay = trial.suggest_loguniform("weight_decay", 1e-6, 1e-4)
+                num_layers = trial.suggest_int("num_layers", 1, 3)
+                num_heads = trial.suggest_categorical("num_heads", [2, 4, 8])
+                dim_feedforward = trial.suggest_categorical("dim_feedforward", [128, 256, 512])
 
                 # 一部のハイパーパラメータを更新
                 config = ModelConfig(
                     LEARNING_RATE=learning_rate,
                     BATCH_SIZE=batch_size,
                     N_EPOCHS=50,  # 最適化時はエポック数を減らす
-                    PATIENCE=self.config.PATIENCE
+                    PATIENCE=self.config.PATIENCE,
                 )
 
                 # クロスバリデーションで評価
                 score = self.pipeline.cross_validate(
-                    self.X_train, self.y_train, config, n_splits=3,
+                    self.X_train,
+                    self.y_train,
+                    config,
+                    n_splits=3,
                     num_layers=num_layers,
                     num_heads=num_heads,
                     dim_feedforward=dim_feedforward,
                     dropout=dropout,
-                    weight_decay=weight_decay
+                    weight_decay=weight_decay,
                 )
 
                 return score  # R2スコアを最大化
 
             # Optunaのプルーナーを設定
             pruner = optuna.pruners.MedianPruner(n_startup_trials=5, n_warmup_steps=10)
-            study = optuna.create_study(direction='maximize', pruner=pruner)
+            study = optuna.create_study(direction="maximize", pruner=pruner)
             study.optimize(objective, n_trials=n_trials)
 
             # 最適なハイパーパラメータで再学習
             best_params = study.best_params
             config = ModelConfig(
-                LEARNING_RATE=best_params['learning_rate'],
-                BATCH_SIZE=best_params['batch_size'],
+                LEARNING_RATE=best_params["learning_rate"],
+                BATCH_SIZE=best_params["batch_size"],
                 N_EPOCHS=self.config.N_EPOCHS,
-                PATIENCE=self.config.PATIENCE
+                PATIENCE=self.config.PATIENCE,
             )
 
             self.pipeline = ModelPipeline(random_state=config.RANDOM_SEED)
             self.pipeline.fit(
-                self.X_train, self.y_train, config,
-                num_layers=best_params['num_layers'],
-                num_heads=best_params['num_heads'],
-                dim_feedforward=best_params['dim_feedforward'],
-                dropout=best_params['dropout'],
-                weight_decay=best_params['weight_decay'],
+                self.X_train,
+                self.y_train,
+                config,
+                num_layers=best_params["num_layers"],
+                num_heads=best_params["num_heads"],
+                dim_feedforward=best_params["dim_feedforward"],
+                dropout=best_params["dropout"],
+                weight_decay=best_params["weight_decay"],
                 early_stopping=True,
                 patience=config.PATIENCE,
-                scheduler=True
+                scheduler=True,
             )
             self.is_trained = True
             logging.info(f"Optuna最適化完了: {best_params}")
@@ -747,7 +878,7 @@ class DATPredictor:
             logging.error(f"ハイパーパラメータ最適化エラー: {e}", exc_info=True)
             raise
 
-    def predict(self, smiles: str) -> Tuple[Optional[float], Optional[Dict[str, float]]]:
+    def predict(self, smiles: str) -> tuple[float | None, dict[str, float] | None]:
         """予測実行"""
         try:
             if not self.is_trained:
@@ -764,18 +895,13 @@ class DATPredictor:
             X = features.reshape(1, -1)
 
             # 特徴量を選択
-            if hasattr(self, 'feature_indices'):
+            if hasattr(self, "feature_indices"):
                 X = X[:, self.feature_indices]
 
             prediction = float(self.pipeline.predict(X)[0])
 
             # モデルの不確実性を推定（ここでは簡易的に標準偏差を0とします）
-            confidence = {
-                'mean': prediction,
-                'std': 0.0,
-                'min': prediction,
-                'max': prediction
-            }
+            confidence = {"mean": prediction, "std": 0.0, "min": prediction, "max": prediction}
 
             return prediction, confidence
 
@@ -791,24 +917,31 @@ class DATPredictor:
 
             temp_path = f"{path}.tmp"
 
-            torch.save({
-                'version': 1.0,  # バージョン情報の追加
-                'model_state_dict': self.pipeline.model.state_dict(),
-                'scaler': self.pipeline.scaler,
-                'y_scaler': self.pipeline.y_scaler,  # y_scaler を含める
-                'is_trained': self.is_trained,
-                'input_dim': self.pipeline.model.embedding.in_features,
-                'num_layers': self.pipeline.model.transformer_encoder.num_layers,
-                'num_heads': self.pipeline.model.transformer_encoder.layers[0].self_attn.num_heads,
-                'dim_feedforward': self.pipeline.model.transformer_encoder.layers[0].linear1.in_features,
-                'dropout': self.pipeline.model.transformer_encoder.layers[0].dropout.p,
-                'model_type': self.model_type,
-                'timestamp': datetime.now().isoformat(),
-                'removed_features': self.removed_features,
-                'feature_names': self.feature_names,
-                'full_feature_names': self.full_feature_names,
-                'feature_indices': self.feature_indices,  # 追加
-            }, temp_path)
+            torch.save(
+                {
+                    "version": 1.0,  # バージョン情報の追加
+                    "model_state_dict": self.pipeline.model.state_dict(),
+                    "scaler": self.pipeline.scaler,
+                    "y_scaler": self.pipeline.y_scaler,  # y_scaler を含める
+                    "is_trained": self.is_trained,
+                    "input_dim": self.pipeline.model.embedding.in_features,
+                    "num_layers": self.pipeline.model.transformer_encoder.num_layers,
+                    "num_heads": self.pipeline.model.transformer_encoder.layers[
+                        0
+                    ].self_attn.num_heads,
+                    "dim_feedforward": self.pipeline.model.transformer_encoder.layers[
+                        0
+                    ].linear1.in_features,
+                    "dropout": self.pipeline.model.transformer_encoder.layers[0].dropout.p,
+                    "model_type": self.model_type,
+                    "timestamp": datetime.now().isoformat(),
+                    "removed_features": self.removed_features,
+                    "feature_names": self.feature_names,
+                    "full_feature_names": self.full_feature_names,
+                    "feature_indices": self.feature_indices,  # 追加
+                },
+                temp_path,
+            )
 
             os.replace(temp_path, path)
             logging.info(f"モデルを保存しました: {path}")
@@ -823,36 +956,46 @@ class DATPredictor:
             checkpoint = torch.load(path, map_location=self.pipeline.device)
 
             # 必要なキーがすべて存在するか確認
-            required_keys = ['version', 'model_state_dict', 'scaler', 'y_scaler', 'is_trained', 'input_dim', 'dropout', 'model_type', 'timestamp']
+            required_keys = [
+                "version",
+                "model_state_dict",
+                "scaler",
+                "y_scaler",
+                "is_trained",
+                "input_dim",
+                "dropout",
+                "model_type",
+                "timestamp",
+            ]
             missing_keys = [key for key in required_keys if key not in checkpoint]
             if missing_keys:
                 raise KeyError(f"チェックポイントに必要なキーが不足しています: {missing_keys}")
 
-            self.pipeline.scaler = checkpoint['scaler']
-            self.pipeline.y_scaler = checkpoint['y_scaler']
-            self.is_trained = checkpoint['is_trained']
-            self.model_type = checkpoint['model_type']
-            self.removed_features = checkpoint.get('removed_features', [])
-            self.feature_names = checkpoint.get('feature_names', [])
-            self.full_feature_names = checkpoint.get('full_feature_names', [])
-            self.feature_indices = checkpoint.get('feature_indices', [])  # 追加
+            self.pipeline.scaler = checkpoint["scaler"]
+            self.pipeline.y_scaler = checkpoint["y_scaler"]
+            self.is_trained = checkpoint["is_trained"]
+            self.model_type = checkpoint["model_type"]
+            self.removed_features = checkpoint.get("removed_features", [])
+            self.feature_names = checkpoint.get("feature_names", [])
+            self.full_feature_names = checkpoint.get("full_feature_names", [])
+            self.feature_indices = checkpoint.get("feature_indices", [])  # 追加
 
             # モデルの初期化
-            input_dim = checkpoint['input_dim']
-            dropout = checkpoint['dropout']
-            num_layers = checkpoint.get('num_layers', 2)
-            num_heads = checkpoint.get('num_heads', 4)
-            dim_feedforward = checkpoint.get('dim_feedforward', 256)
+            input_dim = checkpoint["input_dim"]
+            dropout = checkpoint["dropout"]
+            num_layers = checkpoint.get("num_layers", 2)
+            num_heads = checkpoint.get("num_heads", 4)
+            dim_feedforward = checkpoint.get("dim_feedforward", 256)
 
             self.pipeline.model = TransformerModel(
                 input_dim,
                 num_layers=num_layers,
                 num_heads=num_heads,
                 dim_feedforward=dim_feedforward,
-                dropout=dropout
+                dropout=dropout,
             ).to(self.pipeline.device)
 
-            self.pipeline.model.load_state_dict(checkpoint['model_state_dict'])
+            self.pipeline.model.load_state_dict(checkpoint["model_state_dict"])
             self.pipeline.model.eval()
 
             logging.info(f"モデルを読み込みました: {path}")
@@ -867,12 +1010,15 @@ class DATPredictor:
 
 class TrainingThread(QThread):
     """学習進捗管理スレッド"""
+
     progress = Signal(int)
     status = Signal(str)
     error = Signal(str)
     finished = Signal(dict)
 
-    def __init__(self, predictor: DATPredictor, method: str = 'optuna', target_chembl_id: str = 'CHEMBL238') -> None:
+    def __init__(
+        self, predictor: DATPredictor, method: str = "optuna", target_chembl_id: str = "CHEMBL238"
+    ) -> None:
         super().__init__()
         self.predictor = predictor
         self.method = method
@@ -888,7 +1034,7 @@ class TrainingThread(QThread):
             self.predictor.prepare_data(df)
             self.progress.emit(30)
 
-            if self.method == 'optuna':
+            if self.method == "optuna":
                 self.status.emit("ハイパーパラメータ最適化中（Optuna）...")
                 self.predictor.optimize_hyperparameters(n_trials=20)
             else:
@@ -905,7 +1051,7 @@ class TrainingThread(QThread):
             self.error.emit(str(e))
             logging.error(f"学習エラー: {e}", exc_info=True)
 
-    def _calculate_metrics(self) -> Dict[str, float]:
+    def _calculate_metrics(self) -> dict[str, float]:
         """評価指標の計算"""
         y_train_pred = self.predictor.pipeline.predict(self.predictor.X_train)
         y_test_pred = self.predictor.pipeline.predict(self.predictor.X_test)
@@ -918,11 +1064,11 @@ class TrainingThread(QThread):
         self._plot_residuals(self.predictor.y_test, y_test_pred)
 
         return {
-            'R2 Score (Train)': train_score,
-            'R2 Score (Test)': test_score,
-            'Training Samples': len(self.predictor.X_train),
-            'Test Samples': len(self.predictor.X_test),
-            'Total Features': self.predictor.X_train.shape[1]
+            "R2 Score (Train)": train_score,
+            "R2 Score (Test)": test_score,
+            "Training Samples": len(self.predictor.X_train),
+            "Test Samples": len(self.predictor.X_test),
+            "Total Features": self.predictor.X_train.shape[1],
         }
 
     def _r2_score(self, y_true, y_pred):
@@ -934,22 +1080,23 @@ class TrainingThread(QThread):
         residuals = y_true - y_pred
         plt.figure(figsize=(10, 6))
         sns.scatterplot(x=y_pred, y=residuals)
-        plt.axhline(0, color='red', linestyle='--')
-        plt.title('Residuals Plot')
-        plt.xlabel('Predicted pIC50')
-        plt.ylabel('Residuals')
-        plt.savefig('residuals_plot.png')
+        plt.axhline(0, color="red", linestyle="--")
+        plt.title("Residuals Plot")
+        plt.xlabel("Predicted pIC50")
+        plt.ylabel("Residuals")
+        plt.savefig("residuals_plot.png")
         plt.close()
         logging.info("残差プロットを保存しました: residuals_plot.png")
 
 
 class BatchPredictionThread(QThread):
     """バッチ予測管理スレッド"""
+
     progress = Signal(int)
     result = Signal(tuple)
     error = Signal(str)
 
-    def __init__(self, predictor: DATPredictor, smiles_list: List[str]) -> None:
+    def __init__(self, predictor: DATPredictor, smiles_list: list[str]) -> None:
         super().__init__()
         self.predictor = predictor
         self.smiles_list = smiles_list
@@ -969,6 +1116,7 @@ class BatchPredictionThread(QThread):
 
 class DATPredictorGUI(QMainWindow):
     """DAT活性予測モデルのGUI"""
+
     def __init__(self, predictor: DATPredictor) -> None:
         super().__init__()
         self.predictor = predictor
@@ -979,7 +1127,7 @@ class DATPredictorGUI(QMainWindow):
 
     def _init_ui(self) -> None:
         """UIの初期化"""
-        self.setWindowTitle('🧪 DAT Activity Predictor + TxGemma AI')
+        self.setWindowTitle("🧪 DAT Activity Predictor + TxGemma AI")
         self.setGeometry(100, 100, 1800, 1000)
 
         # メインウィジェットとレイアウト
@@ -999,7 +1147,7 @@ class DATPredictorGUI(QMainWindow):
         # 右パネル（可視化 + TxGemma対話セクション）
         right_panel = self._create_visualization_panel()
         layout.addWidget(right_panel)
-        
+
         # TxGemmaエージェントの初期化
         self._init_txgemma_agent()
 
@@ -1010,26 +1158,26 @@ class DATPredictorGUI(QMainWindow):
 
         # ターゲット選択
         target_layout = QHBoxLayout()
-        target_label = QLabel('Target:')
+        target_label = QLabel("Target:")
         self.target_combo = QComboBox()
-        self.target_combo.addItem('DAT (CHEMBL238)', 'CHEMBL238')
-        self.target_combo.addItem('5HT2A (CHEMBL224)', 'CHEMBL224')
-        self.target_combo.addItem('CB1 (CHEMBL218)', 'CHEMBL218')
-        self.target_combo.addItem('CB2 (CHEMBL1861)', 'CHEMBL1861')
-        self.target_combo.addItem('μ-opioid (CHEMBL233)', 'CHEMBL233')
-        self.target_combo.addItem('δ-opioid (CHEMBL236)', 'CHEMBL236')
-        self.target_combo.addItem('κ-opioid (CHEMBL237)', 'CHEMBL237')
+        self.target_combo.addItem("DAT (CHEMBL238)", "CHEMBL238")
+        self.target_combo.addItem("5HT2A (CHEMBL224)", "CHEMBL224")
+        self.target_combo.addItem("CB1 (CHEMBL218)", "CHEMBL218")
+        self.target_combo.addItem("CB2 (CHEMBL1861)", "CHEMBL1861")
+        self.target_combo.addItem("μ-opioid (CHEMBL233)", "CHEMBL233")
+        self.target_combo.addItem("δ-opioid (CHEMBL236)", "CHEMBL236")
+        self.target_combo.addItem("κ-opioid (CHEMBL237)", "CHEMBL237")
         target_layout.addWidget(target_label)
         target_layout.addWidget(self.target_combo)
         layout.addLayout(target_layout)
 
         # 学習コントロール
         control_layout = QHBoxLayout()
-        self.train_btn = QPushButton('Train Model')
+        self.train_btn = QPushButton("Train Model")
         self.train_btn.clicked.connect(self.handle_training)
         control_layout.addWidget(self.train_btn)
 
-        self.optimize_optuna_btn = QPushButton('Optimize (Optuna)')
+        self.optimize_optuna_btn = QPushButton("Optimize (Optuna)")
         self.optimize_optuna_btn.clicked.connect(self.handle_optuna_training)
         control_layout.addWidget(self.optimize_optuna_btn)
 
@@ -1039,18 +1187,18 @@ class DATPredictorGUI(QMainWindow):
         layout.addWidget(self.progress_bar)
 
         # ステータス表示
-        self.status_label = QLabel('Status: Not trained')
+        self.status_label = QLabel("Status: Not trained")
         layout.addWidget(self.status_label)
 
         # メトリクステーブル
         self.metrics_table = QTableWidget()
         self.metrics_table.setColumnCount(2)
-        self.metrics_table.setHorizontalHeaderLabels(['Metric', 'Value'])
+        self.metrics_table.setHorizontalHeaderLabels(["Metric", "Value"])
         self.metrics_table.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.metrics_table)
 
         # キャッシュクリアボタンの追加
-        self.clear_cache_btn = QPushButton('Clear Cache')
+        self.clear_cache_btn = QPushButton("Clear Cache")
         self.clear_cache_btn.clicked.connect(self.clear_cache)
         layout.addWidget(self.clear_cache_btn)
 
@@ -1068,24 +1216,24 @@ class DATPredictorGUI(QMainWindow):
 
         input_layout = QHBoxLayout()
         self.smiles_input = QLineEdit()
-        self.smiles_input.setPlaceholderText('Enter SMILES')
-        predict_btn = QPushButton('Predict')
+        self.smiles_input.setPlaceholderText("Enter SMILES")
+        predict_btn = QPushButton("Predict")
         predict_btn.clicked.connect(self.handle_single_prediction)
-        input_layout.addWidget(QLabel('SMILES:'))
+        input_layout.addWidget(QLabel("SMILES:"))
         input_layout.addWidget(self.smiles_input)
         input_layout.addWidget(predict_btn)
         single_layout.addLayout(input_layout)
 
-        self.prediction_label = QLabel('Predicted pIC50: ')
+        self.prediction_label = QLabel("Predicted pIC50: ")
         single_layout.addWidget(self.prediction_label)
 
         # 信頼性指標
         confidence_layout = QHBoxLayout()
         self.confidence_labels = {
-            'mean': QLabel('Mean: '),
-            'std': QLabel('Std: '),
-            'min': QLabel('Min: '),
-            'max': QLabel('Max: ')
+            "mean": QLabel("Mean: "),
+            "std": QLabel("Std: "),
+            "min": QLabel("Min: "),
+            "max": QLabel("Max: "),
         }
         for label in self.confidence_labels.values():
             confidence_layout.addWidget(label)
@@ -1116,9 +1264,9 @@ class DATPredictorGUI(QMainWindow):
 
         self.batch_table = QTableWidget()
         self.batch_table.setColumnCount(4)
-        self.batch_table.setHorizontalHeaderLabels([
-            "SMILES", "Predicted pIC50", "Confidence Std", "Status"
-        ])
+        self.batch_table.setHorizontalHeaderLabels(
+            ["SMILES", "Predicted pIC50", "Confidence Std", "Status"]
+        )
         self.batch_table.horizontalHeader().setStretchLastSection(True)
         batch_layout.addWidget(self.batch_table)
 
@@ -1135,7 +1283,7 @@ class DATPredictorGUI(QMainWindow):
 
         # スプリッターで上下分割
         splitter = QSplitter(Qt.Orientation.Vertical)
-        
+
         # 上段：可視化セクション
         viz_widget = QWidget()
         viz_layout = QVBoxLayout()
@@ -1150,18 +1298,18 @@ class DATPredictorGUI(QMainWindow):
         # 分子記述子テーブル
         self.descriptor_table = QTableWidget()
         self.descriptor_table.setColumnCount(2)
-        self.descriptor_table.setHorizontalHeaderLabels(['Descriptor', 'Value'])
+        self.descriptor_table.setHorizontalHeaderLabels(["Descriptor", "Value"])
         self.descriptor_table.horizontalHeader().setStretchLastSection(True)
         self.descriptor_table.setMaximumHeight(150)
         viz_layout.addWidget(self.descriptor_table)
 
         # 特徴量重要度グラフボタン
-        self.feature_importance_btn = QPushButton('Show Feature Importances')
+        self.feature_importance_btn = QPushButton("Show Feature Importances")
         self.feature_importance_btn.clicked.connect(self.handle_show_feature_importances)
         viz_layout.addWidget(self.feature_importance_btn)
 
         # ROC AUCカーブ表示ボタン
-        self.roc_auc_btn = QPushButton('Show ROC AUC Curve')
+        self.roc_auc_btn = QPushButton("Show ROC AUC Curve")
         self.roc_auc_btn.clicked.connect(self.handle_show_roc_auc)
         viz_layout.addWidget(self.roc_auc_btn)
 
@@ -1189,19 +1337,19 @@ class DATPredictorGUI(QMainWindow):
         header_label = QLabel("🤖 TxGemma AI Assistant")
         header_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         header_layout.addWidget(header_label)
-        
+
         # モデル選択
         self.model_combo = QComboBox()
         self.model_combo.addItem("TxGemma-9B", "hf.co/lmstudio-community/txgemma-9b-chat-GGUF:Q6_K")
         self.model_combo.addItem("Llama3.2-3B (軽量)", "llama3.2:3b")
         header_layout.addWidget(QLabel("Model:"))
         header_layout.addWidget(self.model_combo)
-        
+
         # 接続ボタン
         self.connect_btn = QPushButton("Connect")
         self.connect_btn.clicked.connect(self._connect_txgemma)
         header_layout.addWidget(self.connect_btn)
-        
+
         layout.addLayout(header_layout)
 
         # チャット履歴表示
@@ -1221,47 +1369,49 @@ class DATPredictorGUI(QMainWindow):
 
         # 入力エリア
         input_layout = QHBoxLayout()
-        
+
         # クイックコマンドボタン
         quick_btn_layout = QVBoxLayout()
         self.quick_predict_btn = QPushButton("📊 Predict & Explain")
         self.quick_predict_btn.clicked.connect(self._quick_predict_explain)
         self.quick_predict_btn.setEnabled(False)
         quick_btn_layout.addWidget(self.quick_predict_btn)
-        
+
         self.quick_suggest_btn = QPushButton("🎯 Suggest Compounds")
         self.quick_suggest_btn.clicked.connect(self._quick_suggest_compounds)
         self.quick_suggest_btn.setEnabled(False)
         quick_btn_layout.addWidget(self.quick_suggest_btn)
-        
+
         self.quick_design_btn = QPushButton("🧬 Design Molecules")
         self.quick_design_btn.clicked.connect(self._quick_design_molecules)
         self.quick_design_btn.setEnabled(False)
         quick_btn_layout.addWidget(self.quick_design_btn)
-        
+
         input_layout.addLayout(quick_btn_layout)
 
         # テキスト入力
         text_input_layout = QVBoxLayout()
         self.chat_input = QTextEdit()
         self.chat_input.setMaximumHeight(80)
-        self.chat_input.setPlaceholderText("TxGemmaに質問してください...\n例: 'この分子のpIC50を予測して、理由を説明して: CC(C)Nc1ncnc2...'")
+        self.chat_input.setPlaceholderText(
+            "TxGemmaに質問してください...\n例: 'この分子のpIC50を予測して、理由を説明して: CC(C)Nc1ncnc2...'"
+        )
         text_input_layout.addWidget(self.chat_input)
-        
+
         # 送信ボタン
         send_layout = QHBoxLayout()
         self.send_btn = QPushButton("💬 Send")
         self.send_btn.clicked.connect(self._send_chat_message)
         self.send_btn.setEnabled(False)
         send_layout.addWidget(self.send_btn)
-        
+
         self.clear_chat_btn = QPushButton("🗑️ Clear")
         self.clear_chat_btn.clicked.connect(self._clear_chat)
         send_layout.addWidget(self.clear_chat_btn)
-        
+
         text_input_layout.addLayout(send_layout)
         input_layout.addLayout(text_input_layout)
-        
+
         layout.addLayout(input_layout)
 
         return widget
@@ -1270,9 +1420,14 @@ class DATPredictorGUI(QMainWindow):
         """TxGemmaエージェントの初期化"""
         try:
             from src.llm.txgemma_agent import TxGemmaAgent
+
             # デフォルトでTxGemma-9Bを使用
-            self.txgemma_agent = TxGemmaAgent(model_name="hf.co/lmstudio-community/txgemma-9b-chat-GGUF:Q6_K")
-            self._add_chat_message("🤖", "TxGemma AI Assistant initialized! Ready for drug discovery conversations.")
+            self.txgemma_agent = TxGemmaAgent(
+                model_name="hf.co/lmstudio-community/txgemma-9b-chat-GGUF:Q6_K"
+            )
+            self._add_chat_message(
+                "🤖", "TxGemma AI Assistant initialized! Ready for drug discovery conversations."
+            )
             self.connect_btn.setText("Connected ✅")
             self.connect_btn.setEnabled(False)
             self.send_btn.setEnabled(True)
@@ -1280,7 +1435,9 @@ class DATPredictorGUI(QMainWindow):
             self.quick_suggest_btn.setEnabled(True)
             self.quick_design_btn.setEnabled(True)
         except ImportError:
-            self._add_chat_message("❌", "TxGemma agent not available. Please install ollama and pull the model.")
+            self._add_chat_message(
+                "❌", "TxGemma agent not available. Please install ollama and pull the model."
+            )
         except Exception as e:
             self._add_chat_message("❌", f"Failed to initialize TxGemma: {str(e)}")
 
@@ -1289,8 +1446,11 @@ class DATPredictorGUI(QMainWindow):
         try:
             model_name = self.model_combo.currentData()
             from src.llm.txgemma_agent import TxGemmaAgent
+
             self.txgemma_agent = TxGemmaAgent(model_name=model_name)
-            self._add_chat_message("🤖", f"Connected to {model_name}! Ready for drug discovery conversations.")
+            self._add_chat_message(
+                "🤖", f"Connected to {model_name}! Ready for drug discovery conversations."
+            )
             self.connect_btn.setText("Connected ✅")
             self.connect_btn.setEnabled(False)
             self.send_btn.setEnabled(True)
@@ -1303,21 +1463,22 @@ class DATPredictorGUI(QMainWindow):
     def _add_chat_message(self, sender: str, message: str) -> None:
         """チャットにメッセージを追加"""
         from datetime import datetime
+
         timestamp = datetime.now().strftime("%H:%M:%S")
-        
+
         if sender == "🤖":
-            formatted_message = f'<div style="margin: 5px; padding: 8px; background-color: #e3f2fd; border-radius: 5px;">'
-            formatted_message += f'<b>{sender} TxGemma</b> <small>({timestamp})</small><br>'
-            formatted_message += f'{message}</div>'
+            formatted_message = '<div style="margin: 5px; padding: 8px; background-color: #e3f2fd; border-radius: 5px;">'
+            formatted_message += f"<b>{sender} TxGemma</b> <small>({timestamp})</small><br>"
+            formatted_message += f"{message}</div>"
         elif sender == "👤":
-            formatted_message = f'<div style="margin: 5px; padding: 8px; background-color: #f3e5f5; border-radius: 5px;">'
-            formatted_message += f'<b>{sender} You</b> <small>({timestamp})</small><br>'
-            formatted_message += f'{message}</div>'
+            formatted_message = '<div style="margin: 5px; padding: 8px; background-color: #f3e5f5; border-radius: 5px;">'
+            formatted_message += f"<b>{sender} You</b> <small>({timestamp})</small><br>"
+            formatted_message += f"{message}</div>"
         else:
-            formatted_message = f'<div style="margin: 5px; padding: 8px; background-color: #fff3e0; border-radius: 5px;">'
-            formatted_message += f'<b>{sender}</b> <small>({timestamp})</small><br>'
-            formatted_message += f'{message}</div>'
-        
+            formatted_message = '<div style="margin: 5px; padding: 8px; background-color: #fff3e0; border-radius: 5px;">'
+            formatted_message += f"<b>{sender}</b> <small>({timestamp})</small><br>"
+            formatted_message += f"{message}</div>"
+
         self.chat_display.append(formatted_message)
         self.chat_display.verticalScrollBar().setValue(
             self.chat_display.verticalScrollBar().maximum()
@@ -1328,15 +1489,15 @@ class DATPredictorGUI(QMainWindow):
         message = self.chat_input.toPlainText().strip()
         if not message or not self.txgemma_agent:
             return
-        
+
         self._add_chat_message("👤", message)
         self.chat_input.clear()
-        
+
         # TxGemmaに送信
         try:
             response = self.txgemma_agent.chat(
                 message,
-                system_prompt="You are an expert medicinal chemist specializing in CNS drug discovery. Provide scientifically accurate, concise advice."
+                system_prompt="You are an expert medicinal chemist specializing in CNS drug discovery. Provide scientifically accurate, concise advice.",
             )
             self._add_chat_message("🤖", response)
         except Exception as e:
@@ -1355,31 +1516,31 @@ class DATPredictorGUI(QMainWindow):
         if not smiles:
             self._add_chat_message("❌", "Please enter a SMILES string first.")
             return
-        
+
         if not self.predictor.is_trained:
             self._add_chat_message("❌", "Please train a model first.")
             return
-        
+
         try:
             # 予測実行
             prediction, confidence = self.predictor.predict(smiles)
             if prediction is None:
                 self._add_chat_message("❌", "Prediction failed.")
                 return
-            
-            uncertainty = confidence.get('std', 0.0) if confidence else None
-            
+
+            uncertainty = confidence.get("std", 0.0) if confidence else None
+
             # TxGemmaに解説を依頼
-            target = self.target_combo.currentText().split(' ')[0]  # "DAT (CHEMBL238)" -> "DAT"
+            target = self.target_combo.currentText().split(" ")[0]  # "DAT (CHEMBL238)" -> "DAT"
             response = self.txgemma_agent.predict_compound_pIC50(
-                smiles=smiles,
-                target=target,
-                prediction=prediction,
-                uncertainty=uncertainty
+                smiles=smiles, target=target, prediction=prediction, uncertainty=uncertainty
             )
-            
-            self._add_chat_message("🤖", f"**Prediction Results:**\nSMILES: {smiles}\nPredicted pIC50: {prediction:.2f} ± {uncertainty:.2f}\n\n**Analysis:**\n{response}")
-            
+
+            self._add_chat_message(
+                "🤖",
+                f"**Prediction Results:**\nSMILES: {smiles}\nPredicted pIC50: {prediction:.2f} ± {uncertainty:.2f}\n\n**Analysis:**\n{response}",
+            )
+
         except Exception as e:
             self._add_chat_message("❌", f"Error: {str(e)}")
 
@@ -1387,15 +1548,17 @@ class DATPredictorGUI(QMainWindow):
         """クイック化合物提案"""
         if not self.txgemma_agent:
             return
-        
+
         try:
-            target = self.target_combo.currentText().split(' ')[0]
+            target = self.target_combo.currentText().split(" ")[0]
             response = self.txgemma_agent.chat(
                 f"Suggest 5 molecular structures (SMILES) to synthesize next for {target} inhibitor discovery. "
                 f"Focus on diverse scaffolds with high predicted activity. Explain the rationale for each suggestion.",
-                system_prompt="You are an expert medicinal chemist specializing in CNS drug discovery."
+                system_prompt="You are an expert medicinal chemist specializing in CNS drug discovery.",
             )
-            self._add_chat_message("🤖", f"**Active Learning Suggestions for {target}:**\n\n{response}")
+            self._add_chat_message(
+                "🤖", f"**Active Learning Suggestions for {target}:**\n\n{response}"
+            )
         except Exception as e:
             self._add_chat_message("❌", f"Error: {str(e)}")
 
@@ -1403,13 +1566,13 @@ class DATPredictorGUI(QMainWindow):
         """クイック分子設計"""
         if not self.txgemma_agent:
             return
-        
+
         try:
-            target = self.target_combo.currentText().split(' ')[0]
+            target = self.target_combo.currentText().split(" ")[0]
             response = self.txgemma_agent.chat(
                 f"Design 3 novel molecular structures for {target} receptor. "
                 f"Provide SMILES if possible, design rationale, and expected advantages.",
-                system_prompt="You are an expert medicinal chemist specializing in CNS drug discovery."
+                system_prompt="You are an expert medicinal chemist specializing in CNS drug discovery.",
             )
             self._add_chat_message("🤖", f"**Molecular Design for {target}:**\n\n{response}")
         except Exception as e:
@@ -1417,11 +1580,11 @@ class DATPredictorGUI(QMainWindow):
 
     def handle_training(self) -> None:
         """学習処理の開始"""
-        self._start_training(method='default')
+        self._start_training(method="default")
 
     def handle_optuna_training(self) -> None:
         """Optunaによるハイパーパラメータ最適化の開始"""
-        self._start_training(method='optuna')
+        self._start_training(method="optuna")
 
     def _start_training(self, method: str) -> None:
         try:
@@ -1436,7 +1599,9 @@ class DATPredictorGUI(QMainWindow):
             # ターゲットID取得
             target_chembl_id = self.target_combo.currentData()
 
-            self.training_thread = TrainingThread(self.predictor, method=method, target_chembl_id=target_chembl_id)
+            self.training_thread = TrainingThread(
+                self.predictor, method=method, target_chembl_id=target_chembl_id
+            )
             self.training_thread.progress.connect(self.progress_bar.setValue)
             self.training_thread.status.connect(self._update_status)
             self.training_thread.error.connect(self._handle_training_error)
@@ -1447,12 +1612,12 @@ class DATPredictorGUI(QMainWindow):
             self.status_label.setText("Status: Training failed")
             self.train_btn.setEnabled(True)
             self.optimize_optuna_btn.setEnabled(True)
-            QMessageBox.critical(self, 'Error', f"Failed to start training: {str(e)}")
+            QMessageBox.critical(self, "Error", f"Failed to start training: {str(e)}")
             logging.error(f"Training start error: {e}", exc_info=True)
 
     def _update_status(self, status: str) -> None:
         """ステータス表示の更新"""
-        self.status_label.setText(f'Status: {status}')
+        self.status_label.setText(f"Status: {status}")
 
     def _handle_training_error(self, error_message: str) -> None:
         """学習エラーの処理"""
@@ -1460,21 +1625,21 @@ class DATPredictorGUI(QMainWindow):
         self.train_btn.setEnabled(True)
         self.optimize_optuna_btn.setEnabled(True)
         self.training_thread = None
-        QMessageBox.critical(self, 'Error', f"Training error: {error_message}")
+        QMessageBox.critical(self, "Error", f"Training error: {error_message}")
         logging.error(f"Training error: {error_message}", exc_info=True)
 
-    def _handle_training_complete(self, metrics: Dict[str, float]) -> None:
+    def _handle_training_complete(self, metrics: dict[str, float]) -> None:
         """学習完了の処理"""
         try:
             self._update_metrics_table(metrics)
-            model_path = Path(self.predictor.config.MODEL_DIR) / 'dat_transformer_model.pt'
+            model_path = Path(self.predictor.config.MODEL_DIR) / "dat_transformer_model.pt"
             self.predictor.save_model(str(model_path))
 
             self._update_status("Training completed")
             QMessageBox.information(
                 self,
-                'Success',
-                f'Model trained successfully!\nSaved to {self.predictor.config.MODEL_DIR}'
+                "Success",
+                f"Model trained successfully!\nSaved to {self.predictor.config.MODEL_DIR}",
             )
             # 標準物質のpIC50を表示
             self._display_reference_pIC50s()
@@ -1486,7 +1651,7 @@ class DATPredictorGUI(QMainWindow):
             self.optimize_optuna_btn.setEnabled(True)
             self.training_thread = None
 
-    def _update_metrics_table(self, metrics: Dict[str, float]) -> None:
+    def _update_metrics_table(self, metrics: dict[str, float]) -> None:
         """メトリクステーブルの更新"""
         self.metrics_table.setRowCount(0)
         for name, value in metrics.items():
@@ -1494,7 +1659,7 @@ class DATPredictorGUI(QMainWindow):
             self.metrics_table.insertRow(row)
             self.metrics_table.setItem(row, 0, QTableWidgetItem(name))
             if isinstance(value, float):
-                self.metrics_table.setItem(row, 1, QTableWidgetItem(f'{value:.4f}'))
+                self.metrics_table.setItem(row, 1, QTableWidgetItem(f"{value:.4f}"))
             else:
                 self.metrics_table.setItem(row, 1, QTableWidgetItem(str(value)))
 
@@ -1502,7 +1667,9 @@ class DATPredictorGUI(QMainWindow):
         """単一予測の実行"""
         try:
             if not self.predictor.is_trained:
-                QMessageBox.warning(self, 'Warning', 'モデルが学習されていません。先にモデルを学習してください。')
+                QMessageBox.warning(
+                    self, "Warning", "モデルが学習されていません。先にモデルを学習してください。"
+                )
                 return
 
             smiles = self.smiles_input.text().strip()
@@ -1517,17 +1684,21 @@ class DATPredictorGUI(QMainWindow):
             self._update_molecular_display(smiles)
 
         except Exception as e:
-            QMessageBox.warning(self, 'Error', str(e))
+            QMessageBox.warning(self, "Error", str(e))
             logging.error(f"単一予測エラー: {e}", exc_info=True)
 
     def handle_batch_prediction(self) -> None:
         """バッチ予測の実行"""
         try:
             if not self.predictor.is_trained:
-                QMessageBox.warning(self, 'Warning', 'モデルが学習されていません。先にモデルを学習してください。')
+                QMessageBox.warning(
+                    self, "Warning", "モデルが学習されていません。先にモデルを学習してください。"
+                )
                 return
 
-            smiles_list = [s.strip() for s in self.batch_input.toPlainText().split('\n') if s.strip()]
+            smiles_list = [
+                s.strip() for s in self.batch_input.toPlainText().split("\n") if s.strip()
+            ]
             if not smiles_list:
                 raise ValueError("SMILES文字列を入力してください。")
 
@@ -1538,7 +1709,7 @@ class DATPredictorGUI(QMainWindow):
             self.batch_thread.start()
 
         except Exception as e:
-            QMessageBox.warning(self, 'Error', str(e))
+            QMessageBox.warning(self, "Error", str(e))
             logging.error(f"バッチ予測エラー: {e}", exc_info=True)
 
     def _handle_batch_results(self, result_tuple: tuple) -> None:
@@ -1561,7 +1732,7 @@ class DATPredictorGUI(QMainWindow):
 
     def _handle_batch_error(self, error_message: str) -> None:
         """バッチ予測エラーの処理"""
-        QMessageBox.warning(self, 'Error', f"Batch prediction error: {error_message}")
+        QMessageBox.warning(self, "Error", f"Batch prediction error: {error_message}")
         logging.error(f"バッチ予測エラー: {error_message}", exc_info=True)
 
     def export_batch_results(self) -> None:
@@ -1575,13 +1746,13 @@ class DATPredictorGUI(QMainWindow):
             )
 
             if file_path:
-                with open(file_path, 'w', encoding='utf-8') as f:
+                with open(file_path, "w", encoding="utf-8") as f:
                     # ヘッダー書き込み
                     headers = [
                         self.batch_table.horizontalHeaderItem(i).text()
                         for i in range(self.batch_table.columnCount())
                     ]
-                    f.write(','.join(headers) + '\n')
+                    f.write(",".join(headers) + "\n")
 
                     # データ書き込み
                     for row in range(self.batch_table.rowCount()):
@@ -1589,21 +1760,21 @@ class DATPredictorGUI(QMainWindow):
                             self.batch_table.item(row, col).text()
                             for col in range(self.batch_table.columnCount())
                         ]
-                        f.write(','.join(row_data) + '\n')
+                        f.write(",".join(row_data) + "\n")
 
-                QMessageBox.information(self, 'Success', 'Results exported successfully!')
+                QMessageBox.information(self, "Success", "Results exported successfully!")
 
         except Exception as e:
-            QMessageBox.warning(self, 'Error', f"Export failed: {str(e)}")
+            QMessageBox.warning(self, "Error", f"Export failed: {str(e)}")
             logging.error(f"エクスポートエラー: {e}", exc_info=True)
 
-    def _update_prediction_display(self, prediction: float, confidence: Dict[str, float]) -> None:
+    def _update_prediction_display(self, prediction: float, confidence: dict[str, float]) -> None:
         """予測結果の表示更新"""
-        self.prediction_label.setText(f'Predicted pIC50: {prediction:.2f}')
+        self.prediction_label.setText(f"Predicted pIC50: {prediction:.2f}")
 
         for key, value in confidence.items():
             if key in self.confidence_labels:
-                self.confidence_labels[key].setText(f'{key.capitalize()}: {value:.2f}')
+                self.confidence_labels[key].setText(f"{key.capitalize()}: {value:.2f}")
 
     def _update_molecular_display(self, smiles: str) -> None:
         """分子情報の表示更新"""
@@ -1615,13 +1786,14 @@ class DATPredictorGUI(QMainWindow):
             # 構造図の更新
             img = MolToImage(mol)
             buffer = io.BytesIO()
-            img.save(buffer, format='PNG')
+            img.save(buffer, format="PNG")
             qimg = QImage.fromData(buffer.getvalue())
             pixmap = QPixmap.fromImage(qimg)
             scaled_pixmap = pixmap.scaled(
-                400, 400,
+                400,
+                400,
                 Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
+                Qt.TransformationMode.SmoothTransformation,
             )
             self.structure_view.setPixmap(scaled_pixmap)
 
@@ -1640,38 +1812,39 @@ class DATPredictorGUI(QMainWindow):
                 row = self.descriptor_table.rowCount()
                 self.descriptor_table.insertRow(row)
                 self.descriptor_table.setItem(row, 0, QTableWidgetItem(feature_names[i]))
-                self.descriptor_table.setItem(row, 1, QTableWidgetItem(f'{features[i]:.2f}'))
+                self.descriptor_table.setItem(row, 1, QTableWidgetItem(f"{features[i]:.2f}"))
 
         except Exception as e:
-            QMessageBox.warning(self, 'Error', f"Display update failed: {str(e)}")
+            QMessageBox.warning(self, "Error", f"Display update failed: {str(e)}")
             logging.error(f"分子表示エラー: {e}", exc_info=True)
 
     def handle_show_feature_importances(self):
         """特徴量重要度グラフの表示"""
         if not self.predictor.is_trained or self.predictor.importances is None:
-            QMessageBox.information(self, 'Info', 'モデルが学習されていないか、特徴量重要度が利用できません。')
+            QMessageBox.information(
+                self, "Info", "モデルが学習されていないか、特徴量重要度が利用できません。"
+            )
             return
         import matplotlib.pyplot as plt
         import numpy as np
+
         # 上位20特徴量を表示
         importances = self.predictor.importances
         feature_names = self.predictor.feature_names
         indices = np.argsort(importances)[::-1][:20]
         plt.figure(figsize=(10, 6))
         plt.barh([feature_names[i] for i in indices][::-1], importances[indices][::-1])
-        plt.xlabel('Importance')
-        plt.title('Top 20 Feature Importances')
+        plt.xlabel("Importance")
+        plt.title("Top 20 Feature Importances")
         plt.tight_layout()
         plt.show()
 
     def handle_show_roc_auc(self):
         """ROC AUCカーブの表示"""
         if not self.predictor.is_trained:
-            QMessageBox.information(self, 'Info', 'モデルが学習されていません。')
+            QMessageBox.information(self, "Info", "モデルが学習されていません。")
             return
         import matplotlib.pyplot as plt
-        import numpy as np
-        from sklearn.metrics import roc_curve, auc
 
         # pIC50の閾値で2値化（例: 7.0 以上をactive）
         threshold = 7.0
@@ -1687,13 +1860,13 @@ class DATPredictorGUI(QMainWindow):
         auc_test = auc(fpr_test, tpr_test)
 
         plt.figure(figsize=(8, 6))
-        plt.plot(fpr_train, tpr_train, label=f'Train ROC (AUC={auc_train:.2f})')
-        plt.plot(fpr_test, tpr_test, label=f'Test ROC (AUC={auc_test:.2f})')
-        plt.plot([0, 1], [0, 1], 'k--', label='Random')
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.title(f'ROC AUC Curve (Threshold: pIC50≥{threshold})')
-        plt.legend(loc='lower right')
+        plt.plot(fpr_train, tpr_train, label=f"Train ROC (AUC={auc_train:.2f})")
+        plt.plot(fpr_test, tpr_test, label=f"Test ROC (AUC={auc_test:.2f})")
+        plt.plot([0, 1], [0, 1], "k--", label="Random")
+        plt.xlabel("False Positive Rate")
+        plt.ylabel("True Positive Rate")
+        plt.title(f"ROC AUC Curve (Threshold: pIC50≥{threshold})")
+        plt.legend(loc="lower right")
         plt.tight_layout()
         plt.show()
 
@@ -1707,13 +1880,14 @@ class DATPredictorGUI(QMainWindow):
                         item.unlink()
                     elif item.is_dir():
                         import shutil
+
                         shutil.rmtree(item)
-                QMessageBox.information(self, 'Success', 'Cache cleared successfully!')
+                QMessageBox.information(self, "Success", "Cache cleared successfully!")
                 logging.info("キャッシュをクリアしました")
             else:
-                QMessageBox.information(self, 'Info', 'Cache directory does not exist.')
+                QMessageBox.information(self, "Info", "Cache directory does not exist.")
         except Exception as e:
-            QMessageBox.warning(self, 'Error', f"Failed to clear cache: {str(e)}")
+            QMessageBox.warning(self, "Error", f"Failed to clear cache: {str(e)}")
             logging.error(f"キャッシュクリアエラー: {e}", exc_info=True)
 
     def closeEvent(self, event) -> None:
@@ -1744,7 +1918,7 @@ class DATPredictorGUI(QMainWindow):
         self.metrics_table.setRowCount(new_row_count + 1)
         self.metrics_table.insertRow(new_row_count)
         self.metrics_table.setItem(new_row_count, 0, QTableWidgetItem("Reference Compounds pIC50"))
-        self.metrics_table.setItem(new_row_count, 1, QTableWidgetItem("")) # 空のセルを作成
+        self.metrics_table.setItem(new_row_count, 1, QTableWidgetItem(""))  # 空のセルを作成
 
         # 新しいテーブルを作成
         reference_table = QTableWidget()
@@ -1752,7 +1926,7 @@ class DATPredictorGUI(QMainWindow):
         reference_table.setHorizontalHeaderLabels(["Name", "SMILES", "Predicted pIC50"])
         reference_table.horizontalHeader().setStretchLastSection(True)
 
-        for i, (name, smiles, pred) in enumerate(reference_results):
+        for name, smiles, pred in reference_results:
             row = reference_table.rowCount()
             reference_table.insertRow(row)
             reference_table.setItem(row, 0, QTableWidgetItem(name))
@@ -1763,7 +1937,7 @@ class DATPredictorGUI(QMainWindow):
         center_layout = self.centralWidget().layout()
         if center_layout:
             # 既存の中央パネルのレイアウトを取得
-            current_center_layout = center_layout.itemAt(1).layout() # 予測パネルのレイアウト
+            current_center_layout = center_layout.itemAt(1).layout()  # 予測パネルのレイアウト
             if current_center_layout:
                 # 予測パネルの下に新しいテーブルを追加
                 new_layout = QVBoxLayout()
@@ -1778,43 +1952,44 @@ class DATPredictorGUI(QMainWindow):
             # 中央パネルがない場合は、新しいテーブルをウィンドウに直接追加
             new_layout = QVBoxLayout()
             new_layout.addWidget(reference_table)
-            self.setCentralWidget(QWidget()) # 既存の中央パネルをクリア
-            self.setCentralWidget(QWidget()) # 新しい中央パネルを設定
+            self.setCentralWidget(QWidget())  # 既存の中央パネルをクリア
+            self.setCentralWidget(QWidget())  # 新しい中央パネルを設定
             self.centralWidget().setLayout(new_layout)
 
 
 REFERENCE_COMPOUNDS = {
-    'CHEMBL238': {  # DAT
-        'Methamphetamine': 'CC(CC1=CC=CC=C1)NC',
-        'Cocaine': 'CN1C2CCC1C(C2)OC(=O)C3=CC=CC=C3C(=O)OC',
-        'Methylphenidate': 'COC(=O)C1=CC=CC=C1C(C)N',
+    "CHEMBL238": {  # DAT
+        "Methamphetamine": "CC(CC1=CC=CC=C1)NC",
+        "Cocaine": "CN1C2CCC1C(C2)OC(=O)C3=CC=CC=C3C(=O)OC",
+        "Methylphenidate": "COC(=O)C1=CC=CC=C1C(C)N",
     },
-    'CHEMBL224': {  # 5HT2A
-        'LSD': 'CN(C)C1CCC2=C1C3C(C2)C4=CC=CC=C4N3C',
-        'DMT': 'CN(C)CCC1=CNC2=CC=CC=C12',
-        'Psilocybin': 'COP(=O)(O)OCC1C2=CC=CC=C2NC1',
+    "CHEMBL224": {  # 5HT2A
+        "LSD": "CN(C)C1CCC2=C1C3C(C2)C4=CC=CC=C4N3C",
+        "DMT": "CN(C)CCC1=CNC2=CC=CC=C12",
+        "Psilocybin": "COP(=O)(O)OCC1C2=CC=CC=C2NC1",
     },
-    'CHEMBL218': {  # CB1
-        'WIN 55,212-2': 'CN1CC(C2=CC=CC=C2)C(C3=CC=CC=C3)C1',
-        'CP 55,940': 'CC(C)(C)C1=CC2=C(C=C1)C3CC(C2)C4=CC=CC=C4C3',
+    "CHEMBL218": {  # CB1
+        "WIN 55,212-2": "CN1CC(C2=CC=CC=C2)C(C3=CC=CC=C3)C1",
+        "CP 55,940": "CC(C)(C)C1=CC2=C(C=C1)C3CC(C2)C4=CC=CC=C4C3",
     },
-    'CHEMBL1861': {  # CB2
-        'JWH-133': 'CC(C)C1=CC2=C(C=C1)C3CC(C2)C4=CC=CC=C4C3',
-        'HU-308': 'CC(C)C1=CC2=C(C=C1)C3CC(C2)C4=CC=CC=C4C3O',
+    "CHEMBL1861": {  # CB2
+        "JWH-133": "CC(C)C1=CC2=C(C=C1)C3CC(C2)C4=CC=CC=C4C3",
+        "HU-308": "CC(C)C1=CC2=C(C=C1)C3CC(C2)C4=CC=CC=C4C3O",
     },
-    'CHEMBL233': {  # μ-opioid
-        'Morphine': 'CN1CC[C@]23C4=C5C=CC(O)=C4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5',
-        'DAMGO': 'CC(C)C[C@H](NC(=O)[C@H](N)CCC(=O)NCC(=O)N)C(=O)NCC(=O)N',
+    "CHEMBL233": {  # μ-opioid
+        "Morphine": "CN1CC[C@]23C4=C5C=CC(O)=C4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5",
+        "DAMGO": "CC(C)C[C@H](NC(=O)[C@H](N)CCC(=O)NCC(=O)N)C(=O)NCC(=O)N",
     },
-    'CHEMBL236': {  # δ-opioid
-        'DPDPE': 'CC(C)C[C@H](NC(=O)[C@H](N)CCC(=O)NCC(=O)N)C(=O)NCC(=O)N',
-        'SNC80': 'CC1=CC2=C(C=C1)C3CC(C2)C4=CC=CC=C4C3',
+    "CHEMBL236": {  # δ-opioid
+        "DPDPE": "CC(C)C[C@H](NC(=O)[C@H](N)CCC(=O)NCC(=O)N)C(=O)NCC(=O)N",
+        "SNC80": "CC1=CC2=C(C=C1)C3CC(C2)C4=CC=CC=C4C3",
     },
-    'CHEMBL237': {  # κ-opioid
-        'U-50488': 'CC1=CC2=C(C=C1)C3CC(C2)C4=CC=CC=C4C3N',
-        'Salvinorin A': 'CC1=CC2=C(C=C1)C3CC(C2)C4=CC=CC=C4C3OC(=O)C',
+    "CHEMBL237": {  # κ-opioid
+        "U-50488": "CC1=CC2=C(C=C1)C3CC(C2)C4=CC=CC=C4C3N",
+        "Salvinorin A": "CC1=CC2=C(C=C1)C3CC(C2)C4=CC=CC=C4C3OC(=O)C",
     },
 }
+
 
 def get_reference_pIC50s(predictor, target_chembl_id):
     refs = REFERENCE_COMPOUNDS.get(target_chembl_id, {})
@@ -1832,7 +2007,7 @@ def main():
         predictor = DATPredictor()
 
         # 保存済みモデルの読み込み
-        model_path = Path(predictor.config.MODEL_DIR) / 'dat_transformer_model.pt'
+        model_path = Path(predictor.config.MODEL_DIR) / "dat_transformer_model.pt"
         if model_path.exists():
             predictor.load_model(str(model_path))
 
@@ -1845,5 +2020,5 @@ def main():
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

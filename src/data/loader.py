@@ -180,6 +180,8 @@ class ChEMBLDataLoader:
         Returns:
             Preprocessed DataFrame with canonical_smiles and pIC50 columns
         """
+        logger = getattr(self, "logger", logging.getLogger(__name__))
+
         # Select required columns
         required_cols = ['molecule_chembl_id', 'canonical_smiles', 'standard_value']
         missing_cols = [col for col in required_cols if col not in df.columns]
@@ -193,7 +195,7 @@ class ChEMBLDataLoader:
         initial_count = len(df)
         df = df.dropna()
         if len(df) < initial_count:
-            self.logger.warning(f"Removed {initial_count - len(df)} rows with missing values")
+            logger.warning(f"Removed {initial_count - len(df)} rows with missing values")
         
         # Convert standard_value to numeric
         df['standard_value'] = pd.to_numeric(df['standard_value'], errors='coerce')
@@ -232,7 +234,7 @@ class ChEMBLDataLoader:
             'pIC50': valid_pic50
         })
         
-        self.logger.info(f"Preprocessing complete: {len(result_df)} valid samples")
+        logger.info(f"Preprocessing complete: {len(result_df)} valid samples")
         return result_df
     
     def split_data(
@@ -291,4 +293,4 @@ class ChEMBLDataLoader:
             'pIC50_min': df['pIC50'].min(),
             'pIC50_max': df['pIC50'].max(),
             'unique_smiles': df['canonical_smiles'].nunique()
-        } 
+        }

@@ -1,419 +1,324 @@
-# DAT Activity Predictor + TxGemma AI 🧬🤖
+# Multi-Target pIC50 Predictor
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
-[![RTX3060](https://img.shields.io/badge/GPU-RTX3060-green.svg)](https://www.nvidia.com/)
 
-**RTX3060最適化・本番環境対応の創薬AIシステム**
+A drug-discovery research toolkit for multi-target pIC50 prediction, compound
+triage, and early medicinal chemistry decision support.
 
-DAT活性予測とTxGemma-9B自然言語対話による創薬支援を提供する、完全Docker化された本番環境システムです。
+The project started as a DAT activity predictor and now includes a modular
+discovery pipeline for:
 
----
+- multi-target pIC50 modeling across DAT, 5-HT2A, CB1, CB2, and opioid receptors
+- RDKit descriptors, ECFP4/MACCS fingerprints, SMARTS flags, and graph features
+- ETKDG 3D conformer generation with geometry descriptors
+- ADMET and developability triage
+- synthetic accessibility scoring with SA score and SCScore-style proxies
+- retrosynthesis and forward-reaction baseline planning
+- molecule image features for multimodal image + structure experiments
+- optional Prefect/Airflow-style automation hooks
+- future AlphaFold3 and docking simulation integration contracts
 
-## 🎯 概要
+This code is intended for research and prioritization. It is not a clinical,
+regulatory, or manufacturing decision system.
 
-**DAT Activity Predictor + TxGemma AI**は、以下の機能を統合した次世代創薬支援システムです：
+## Repository Layout
 
-- 🧬 **マルチターゲット活性予測**: DAT, 5HT2A, CB1, CB2, μ/δ/κ-opioid受容体
-- 🤖 **TxGemma-9B統合**: 自然言語対話による創薬プロセス支援
-- 🐳 **完全Docker化**: ワンコマンドデプロイ
-- ⚡ **RTX3060最適化**: 混合精度・メモリ管理・パフォーマンス最適化
-- 📊 **本番監視**: Prometheus + Grafana統合
-- 🛡️ **エラー回復**: 自動回復・ログ管理・セキュリティ
-
----
-
-## 🚀 クイックスタート
-
-### 1. リポジトリクローン
-```bash
-git clone https://github.com/zapabob/multi-target-pIC50-predictor.git
-cd multi-target-pIC50-predictor
+```text
+.
+|-- cli.py                         # Command-line entry point
+|-- dat_predictor.py               # Legacy DAT predictor and GUI logic
+|-- pyproject.toml                 # UV-managed project dependencies
+|-- uv.lock                        # Reproducible dependency lockfile
+|-- src/
+|   |-- admet/                     # ADMET and developability profiling
+|   |-- active_learning/           # Compound selection helpers
+|   |-- data/                      # ChEMBL loading and dataset splitting
+|   |-- features/                  # Molecular, graph, and 3D featurizers
+|   |-- integrations/              # AlphaFold3 and docking job contracts
+|   |-- models/                    # Transformer, GNN, ensemble, geometry GNNs
+|   |-- multimodal/                # Molecule image feature extraction
+|   |-- pipeline/                  # Integrated compound assessment workflows
+|   |-- reactions/                 # Retro/forward reaction planning baseline
+|   `-- synthesis/                 # Synthetic accessibility scoring
+|-- tests/                         # Unit and integration tests
+|-- docs/                          # Design and environment notes
+`-- scripts/                       # Environment smoke checks and utilities
 ```
 
-### 2. 本番環境デプロイ
+## Installation with UV
+
+UV is the preferred environment manager for this repository.
+
 ```bash
-# 環境設定
+uv sync
+```
+
+The default environment installs the core scientific stack:
+
+- RDKit
+- NumPy, pandas, SciPy, scikit-learn
+- PyTorch
+- pytest and development tools
+- pIC50, ADMET, 3D conformer, synthesis, and image-feature dependencies
+
+Optional extras are available for heavier workflows:
+
+```bash
+# Prefect orchestration
+uv sync --extra workflow
+
+# PyTorch Geometric model adapters
+uv sync --extra gnn
+
+# Protein structure and docking file helpers
+uv sync --extra structure
+
+# GUI dependencies
+uv sync --extra gui
+
+# API and production runtime dependencies
+uv sync --extra prod
+```
+
+Airflow is intentionally managed separately because it should be installed with
+the official Airflow constraints file:
+
+```bash
+uv pip install "apache-airflow==2.10.5" --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.10.5/constraints-3.12.txt"
+```
+
+See [docs/uv_environment.md](docs/uv_environment.md) for more details.
+
+## Quick Start
+
+Run a no-model compound assessment. This produces ADMET and synthesis outputs,
+and can optionally include 3D, reaction, and image features.
+
+```bash
+uv run python cli.py assess --smiles "CC(=O)OC1=CC=CC=C1C(=O)O"
+```
+
+Write the assessment to JSON:
+
+```bash
+uv run python cli.py assess \
+  --smiles "CC(=O)OC1=CC=CC=C1C(=O)O" \
+  --output artifacts/assessment.json
+```
+
+Assess a file of SMILES strings:
+
+```bash
+uv run python cli.py assess --input compounds.smi --output artifacts/assessment.csv
+```
+
+Include rendered image features:
+
+```bash
+uv run python cli.py assess \
+  --input compounds.smi \
+  --include-image \
+  --output artifacts/multimodal_assessment.json
+```
+
+Use a trained pIC50 model when available:
+
+```bash
+uv run python cli.py assess \
+  --model models/dat_transformer_model.pt \
+  --target CHEMBL238 \
+  --smiles "CCN(CC)CC"
+```
+
+## Core Workflows
+
+### pIC50 Prediction
+
+The existing pIC50 workflow supports ChEMBL-based target data retrieval,
+feature calculation, Transformer training, and prediction with optional
+uncertainty reporting.
+
+```bash
+uv run python cli.py train --target CHEMBL238 --optimize
+uv run python cli.py predict --model models/dat_transformer_model.pt --smiles "CCN(CC)CC"
+```
+
+Supported target examples:
+
+| Target | ChEMBL ID | Description |
+| --- | --- | --- |
+| DAT | CHEMBL238 | Dopamine transporter |
+| 5-HT2A | CHEMBL224 | Serotonin 2A receptor |
+| CB1 | CHEMBL218 | Cannabinoid receptor 1 |
+| CB2 | CHEMBL253 / CHEMBL1861 | Cannabinoid receptor 2 |
+| mu opioid | CHEMBL233 | Mu opioid receptor |
+| delta opioid | CHEMBL236 | Delta opioid receptor |
+| kappa opioid | CHEMBL237 | Kappa opioid receptor |
+
+### 3D Structure Features
+
+`src/features/structure3d.py` generates RDKit ETKDGv3 conformers, optimizes
+them with MMFF or UFF, and returns 3D descriptors such as radius of gyration,
+asphericity, eccentricity, principal moments of inertia, and spherocity index.
+
+These descriptors are available through the integrated `assess` command.
+
+### Geometry-Aware GNNs
+
+`src/models/geometry_gnn.py` defines a factory adapter for SchNet and DimeNet++.
+Install the GNN extra before using these models:
+
+```bash
+uv sync --extra gnn
+```
+
+Some PyTorch Geometric operations may require compiled extensions such as
+`torch-scatter` or `torch-sparse`. On Windows, install those from the PyG wheel
+index that matches your local Torch and CUDA build.
+
+### ADMET Integration
+
+`src/admet/predictor.py` provides a lightweight rule-based ADMET profile using
+RDKit descriptors:
+
+- molecular weight
+- LogP
+- TPSA
+- HBD/HBA
+- rotatable bonds
+- formal charge
+- QED
+- permeability and solubility proxies
+- developability proxy score
+
+This is a triage layer. Replace or ensemble it with calibrated ADMET models for
+production-grade prediction.
+
+### Synthetic Accessibility
+
+`src/synthesis/scores.py` provides:
+
+- SA score proxy
+- SCScore-style proxy
+- synthetic feasibility score
+- complexity drivers such as stereocenters, ring count, graph complexity,
+  spiro atoms, bridgehead atoms, and flexibility
+
+Use these outputs to rank compounds before synthesis planning or docking.
+
+### Reaction Route Prediction
+
+`src/reactions/planner.py` provides a conservative baseline interface for:
+
+- retrosynthetic template disconnections
+- forward reaction templates
+- route serialization through `ReactionRoute` and `ReactionStep`
+
+The current templates are intentionally simple. The interface is ready for
+AiZynthFinder, ASKCOS, IBM RXN, or an in-house reaction transformer.
+
+### Multimodal Features
+
+`src/multimodal/image_featurizer.py` renders molecule images with RDKit and
+converts them into compact image-derived features. These can be combined with
+graph, descriptor, or 3D features for image + structure experiments.
+
+### Automation
+
+`src/pipeline/workflows.py` includes:
+
+- batch assessment runner
+- JSON/CSV result writing
+- optional Prefect flow factory
+- optional Airflow DAG factory
+
+Run Prefect workflows after installing:
+
+```bash
+uv sync --extra workflow
+```
+
+## AlphaFold3 and Docking Integration
+
+`src/integrations/structure_pipeline.py` defines project-level contracts for:
+
+- protein target metadata
+- local AlphaFold3-style protein-ligand JSON payloads
+- docking job specifications
+- command-line docking runners
+
+The AlphaFold3 contract exports payloads containing `sequences`, ligand SMILES,
+`modelSeeds`, `dialect`, and `version`. AlphaFold Server has non-commercial and
+ligand restrictions, so this project keeps the integration focused on local or
+managed AlphaFold3 deployments.
+
+Docking support is intentionally backend-neutral. The current runner can build
+command lines for tools such as Vina, Gnina, or site-specific docking wrappers.
+
+## Validation
+
+Run the environment smoke check:
+
+```bash
+uv run python -B scripts/smoke_uv_env.py
+```
+
+Run the discovery extension tests:
+
+```bash
+uv run python -B -m pytest tests/test_discovery_extensions.py tests/test_structure_integration_contracts.py -q
+```
+
+Run Ruff checks:
+
+```bash
+uv run ruff check . --preview
+uv run ruff format . --check
+```
+
+The current codebase still contains legacy Ruff issues outside the newly added
+discovery modules. Treat a full-project Ruff cleanup as a separate refactoring
+task.
+
+## Docker Production Stack
+
+The production compose stack includes:
+
+- application service
+- PostgreSQL
+- Redis
+- Ollama for TxGemma
+- Nginx
+- Prometheus
+- Grafana
+
+Typical production deployment:
+
+```bash
 cp .env.example .env
 cp config/config.yaml.example config/config.yaml
-
-# 本番デプロイ（ワンコマンド）
 ./scripts/deploy.sh production deploy
 ```
 
-### 3. アクセス
-- **アプリケーション**: http://localhost:8000
-- **Grafana監視**: http://localhost:3000 (admin/admin123)
-- **Prometheus**: http://localhost:9090
+Service defaults:
 
----
+- application: `http://localhost:8000`
+- Grafana: `http://localhost:3000`
+- Prometheus: `http://localhost:9090`
 
-## 🏗️ システム構成
+## Research Notes
 
-### Docker Compose統合
-```yaml
-services:
-  dat-predictor-app    # メインアプリケーション
-  postgres            # PostgreSQL データベース
-  redis              # Redis キャッシュ
-  ollama             # TxGemma-9B LLM
-  nginx              # リバースプロキシ
-  prometheus         # メトリクス収集
-  grafana           # ダッシュボード
-```
+- Use scaffold splits when evaluating medicinal chemistry generalization.
+- Keep pIC50, ADMET, synthesis, docking, and AlphaFold-derived evidence
+  separate until you have calibration data for combined ranking.
+- Track uncertainty and applicability domain for every prediction.
+- Validate reaction routes with a chemist and a dedicated retrosynthesis engine
+  before synthesis decisions.
+- Treat docking and AlphaFold3 outputs as structural hypotheses, not binding
+  truth.
 
-### 主要コンポーネント
-- **🧠 AI/ML**: Transformer, GNN, アンサンブル学習
-- **🤖 LLM**: TxGemma-9B自然言語対話
-- **📊 監視**: ヘルスチェック・メトリクス・アラート
-- **🛡️ セキュリティ**: JWT認証・監査ログ・レート制限
-- **⚡ 最適化**: RTX3060特化・メモリ管理・自動回復
+## License
 
----
-
-## 🧬 機能詳細
-
-### マルチターゲット活性予測
-```python
-# 対応ターゲット
-targets = {
-    'DAT': 'CHEMBL238',      # ドパミントランスポーター
-    '5HT2A': 'CHEMBL224',    # セロトニン2A受容体
-    'CB1': 'CHEMBL218',      # カンナビノイド受容体1
-    'CB2': 'CHEMBL1861',     # カンナビノイド受容体2
-    'mu_opioid': 'CHEMBL233', # μ-オピオイド受容体
-    'delta_opioid': 'CHEMBL236', # δ-オピオイド受容体
-    'kappa_opioid': 'CHEMBL237'  # κ-オピオイド受容体
-}
-```
-
-### 分子特徴量
-- **RDKit記述子**: MolWt, LogP, TPSA, NumHDonors, etc.
-- **フィンガープリント**: ECFP4 (1024bit), MACCS (167bit)
-- **SMARTS特徴量**: サイケデリックス特化パターン
-- **グラフ特徴量**: 原子・結合特徴量（GNN用）
-
-### AI/MLモデル
-- **Transformer**: 自己注意機構による表現学習
-- **GNN**: グラフニューラルネットワーク
-- **アンサンブル**: 複数モデル統合予測
-- **不確実性推定**: MC Dropout, Deep Ensemble
-- **能動学習**: 効率的なデータ収集
-
----
-
-## 🤖 TxGemma-9B統合
-
-### 自然言語対話機能
-```python
-# 創薬支援対話例
-user: "DAT活性が高い化合物を設計したい"
-ai: "DAT活性向上のため、以下の構造特徴を考慮してください：
-     - フェネチルアミン骨格
-     - メトキシ基の導入
-     - 脂溶性の最適化"
-
-user: "この化合物の副作用リスクは？"
-ai: "5HT2A活性とオピオイド受容体への結合を確認し、
-     サイケデリック効果と依存性リスクを評価します"
-```
-
-### プロンプトエンジニアリング
-- **創薬支援**: 化合物設計・最適化提案
-- **予測解釈**: 結果の説明・根拠提示
-- **リスク評価**: 副作用・毒性予測
-- **文献検索**: 関連研究の紹介
-
----
-
-## ⚡ RTX3060最適化
-
-### パフォーマンス最適化
-```yaml
-performance:
-  gpu:
-    mixed_precision: true      # FP16使用
-    gradient_checkpointing: true # メモリ削減
-    memory_fraction: 0.8       # メモリ使用率制限
-  cpu:
-    num_workers: 4            # 並列処理
-    pin_memory: true          # メモリ固定
-```
-
-### 自動最適化機能
-- **最適バッチサイズ**: 自動決定
-- **メモリ管理**: 自動クリーンアップ
-- **エラー回復**: GPU メモリエラー自動回復
-- **スループット**: リアルタイム監視
-
----
-
-## 📊 監視・ログ
-
-### Prometheus メトリクス
-```python
-# 主要メトリクス
-- dat_predictor_predictions_total
-- dat_predictor_prediction_duration_seconds
-- dat_predictor_txgemma_duration_seconds
-- dat_predictor_errors_total
-- dat_predictor_gpu_memory_usage_percent
-```
-
-### Grafana ダッシュボード
-- **システム監視**: CPU, GPU, メモリ使用率
-- **アプリケーション**: 予測数, 応答時間, エラー率
-- **TxGemma**: 対話数, トークン数, 応答時間
-- **データベース**: 接続数, クエリ時間
-
-### 構造化ログ
-```json
-{
-  "timestamp": "2025-10-14T12:25:17Z",
-  "level": "INFO",
-  "message": "Prediction made",
-  "smiles": "CC(CC1=CC=CC=C1)NC",
-  "target": "DAT",
-  "prediction": 7.2,
-  "uncertainty": 0.3,
-  "processing_time": 0.8
-}
-```
-
----
-
-## 🛠️ 使用方法
-
-### CLI使用
-```bash
-# モデル学習
-py -3 cli.py train --target DAT --optimize
-
-# 予測実行
-py -3 cli.py predict --target DAT --smiles "CC(CC1=CC=CC=C1)NC"
-
-# TxGemma対話
-py -3 cli.py chat
-
-# ヘルスチェック
-py -3 cli.py health
-```
-
-### GUI使用
-```bash
-# GUI起動
-py -3 main.py
-```
-
-GUI機能:
-- 🧬 化合物入力・予測実行
-- 📊 結果可視化・特徴量重要度
-- 🤖 TxGemma対話チャット
-- 📈 学習曲線・分布表示
-- ⚙️ モデル設定・最適化
-
-### Docker使用
-```bash
-# サービス管理
-./scripts/deploy.sh production start    # 開始
-./scripts/deploy.sh production stop     # 停止
-./scripts/deploy.sh production restart  # 再起動
-./scripts/deploy.sh production health   # ヘルスチェック
-./scripts/deploy.sh production logs     # ログ確認
-```
-
----
-
-## 🔧 設定
-
-### 環境変数
-```bash
-# .env
-ENV=production
-CUDA_VISIBLE_DEVICES=0
-OLLAMA_HOST=http://ollama:11434
-DATABASE_URL=postgresql://dat_user:password@postgres:5432/dat_predictor
-REDIS_URL=redis://redis:6379/0
-SECRET_KEY=your-secret-key
-```
-
-### 設定ファイル
-```yaml
-# config/config.yaml
-app:
-  environment: "production"
-  debug: false
-  workers: 4
-
-models:
-  cache_dir: "/app/cache/models"
-  default_batch_size: 32
-
-txgemma:
-  model_name: "txgemma:9b-chat-q6_k"
-  timeout: 60
-```
-
----
-
-## 🛡️ セキュリティ
-
-### 認証・認可
-- **JWT認証**: トークンベース認証
-- **ロール管理**: 管理者・一般ユーザー
-- **セッション管理**: 自動タイムアウト
-
-### 監査・ログ
-- **操作ログ**: 全操作の記録
-- **セキュリティイベント**: 異常アクセス検出
-- **データ保護**: 個人情報・機密データ保護
-
-### ネットワークセキュリティ
-- **HTTPS**: SSL/TLS暗号化
-- **CORS**: クロスオリジン制御
-- **レート制限**: API呼び出し制限
-
----
-
-## 📈 パフォーマンス
-
-### ベンチマーク（RTX3060）
-- **予測処理**: < 1秒/化合物
-- **訓練処理**: < 10分/エポック
-- **TxGemma対話**: < 5秒/応答
-- **GPU使用率**: 80-90%
-- **メモリ使用量**: < 8GB VRAM
-
-### スケーラビリティ
-- **水平スケーリング**: 複数ワーカー
-- **垂直スケーリング**: GPU メモリ最適化
-- **ロードバランシング**: Nginx統合
-- **キャッシュ**: Redis統合
-
----
-
-## 🔄 運用・メンテナンス
-
-### 自動化機能
-- **バックアップ**: 日次自動バックアップ
-- **ログローテーション**: 自動ログ管理
-- **ヘルスチェック**: 定期監視
-- **アラート通知**: 異常検出
-
-### メンテナンス
-```bash
-# データベース最適化
-docker-compose exec postgres psql -U dat_user -d dat_predictor -c "VACUUM ANALYZE;"
-
-# キャッシュクリア
-docker-compose exec redis redis-cli FLUSHALL
-
-# ログローテーション
-docker-compose exec dat-predictor logrotate -f /etc/logrotate.conf
-```
-
----
-
-## 🧪 テスト
-
-### テスト実行
-```bash
-# 全テスト実行
-pytest tests/
-
-# 特定テスト実行
-pytest tests/test_model.py -v
-
-# カバレッジ測定
-pytest --cov=src tests/
-```
-
-### テスト内容
-- **ユニットテスト**: 各モジュールの単体テスト
-- **統合テスト**: システム統合テスト
-- **パフォーマンステスト**: 負荷テスト
-- **セキュリティテスト**: 脆弱性テスト
-
----
-
-## 📚 ドキュメント
-
-### 詳細ドキュメント
-- [本番環境デプロイガイド](README_PRODUCTION.md)
-- [API仕様書](docs/api.md)
-- [アーキテクチャ設計](docs/architecture.md)
-- [運用マニュアル](docs/operations.md)
-
-### 実装ログ
-- [GNN・アンサンブル・TxGemma実装](_docs/2025-10-14_gnn_ensemble_txgemma_implementation.md)
-- [本番環境実装完了](_docs/2025-10-14_本番環境実装完了.md)
-- [GUI起動修正](_docs/2025-07-15_GUI起動修正.md)
-
----
-
-## 🤝 貢献
-
-### 開発参加
-1. **Fork**: リポジトリをフォーク
-2. **Branch**: 機能ブランチ作成
-3. **Commit**: 変更をコミット
-4. **Pull Request**: PR作成
-
-### コーディング規約
-- **PEP8**: Python コーディング規約
-- **型ヒント**: 型注釈必須
-- **ドキュメント**: docstring必須
-- **テスト**: テストカバレッジ80%以上
-
----
-
-## 📄 ライセンス
-
-MIT License - 詳細は[LICENSE](LICENSE)ファイルを参照
-
----
-
-## 🙏 謝辞
-
-- **ChEMBL**: 分子活性データ
-- **RDKit**: 分子処理ライブラリ
-- **PyTorch**: 深層学習フレームワーク
-- **TxGemma**: 自然言語処理モデル
-- **Docker**: コンテナ化技術
-
----
-
-## 📞 サポート
-
-### トラブルシューティング
-- [FAQ](docs/faq.md)
-- [トラブルシューティング](docs/troubleshooting.md)
-- [Issue報告](https://github.com/zapabob/multi-target-pIC50-predictor/issues)
-
-### 連絡先
-- **GitHub Issues**: バグ報告・機能要望
-- **Discussions**: 質問・議論
-- **Wiki**: 詳細情報
-
----
-
-## 🎯 ロードマップ
-
-### v2.0 (予定)
-- [ ] 3D分子構造対応
-- [ ] マルチモーダル学習
-- [ ] リアルタイム予測API
-- [ ] クラウドデプロイ対応
-
-### v3.0 (予定)
-- [ ] 量子化学計算統合
-- [ ] 創薬パイプライン自動化
-- [ ] 大規模データ処理
-- [ ] エッジコンピューティング対応
-
----
-
-**🚀 創薬の未来を、AIと共に。**
-
-*DAT Activity Predictor + TxGemma AI - 次世代創薬支援システム*
+This project is licensed under the MIT License.
