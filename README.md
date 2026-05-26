@@ -23,6 +23,17 @@ discovery pipeline for:
 This code is intended for research and prioritization. It is not a clinical,
 regulatory, or manufacturing decision system.
 
+## AI Engineering Evidence Card
+
+| Field | Current public evidence |
+| --- | --- |
+| Model surface | Transformer pIC50 workflow, optional GNN adapters, ensemble hooks, uncertainty reporting, and no-model compound assessment paths |
+| Dataset surface | ChEMBL-backed target activity workflows for DAT, 5-HT2A, CB1, CB2, and opioid receptors, plus SMILES file triage inputs |
+| Feature engineering | RDKit descriptors, ECFP4/MACCS fingerprints, SMARTS flags, ETKDGv3 3D descriptors, graph features, ADMET proxies, and synthetic accessibility scoring |
+| Repro command | `uv sync` then `uv run python cli.py train --target CHEMBL238 --optimize` and `uv run python cli.py assess --smiles "CCN(CC)CC"` |
+| Metrics to inspect | Unit/integration tests cover model, pipeline, discovery extension, and structure integration contracts; promote benchmark tables here when a calibrated public run is available |
+| Limitations | Research triage only; pIC50, ADMET, docking, and synthesis outputs require calibration and expert review before real-world decisions |
+
 ## Repository Layout
 
 ```text
