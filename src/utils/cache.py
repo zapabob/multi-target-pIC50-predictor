@@ -113,6 +113,12 @@ class DataCache:
             try:
                 return pd.read_parquet(data_path)
             except Exception:
+                pass
+        pickle_path = self._get_data_path(target_id, suffix=".pkl")
+        if pickle_path.exists():
+            try:
+                return pd.read_pickle(pickle_path)
+            except Exception:
                 return None
         return None
 
@@ -124,7 +130,11 @@ class DataCache:
             data: DataFrame to cache
         """
         data_path = self._get_data_path(target_id)
-        data.to_parquet(data_path, index=False)
+        try:
+            data.to_parquet(data_path, index=False)
+        except ImportError:
+            pickle_path = self._get_data_path(target_id, suffix=".pkl")
+            data.to_pickle(pickle_path)
 
     def get_raw_path(self, target_id: str) -> Path:
         """Get path for raw data dump.

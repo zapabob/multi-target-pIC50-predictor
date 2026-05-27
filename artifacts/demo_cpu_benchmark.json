@@ -1,0 +1,162 @@
+{
+  "model_version": "demo-cpu-ridge-v1",
+  "model_kind": "cpu_descriptor_ridge",
+  "device": "cpu",
+  "context_of_use": {
+    "intended_use": "CPU-only early discovery demo for small-molecule pIC50 triage.",
+    "decision_role": "research_triage_only",
+    "not_for": [
+      "clinical_decision",
+      "regulatory_submission",
+      "manufacturing_release",
+      "patient_care"
+    ],
+    "endpoint": "Target-specific pIC50 derived from IC50 nM values. The bundled dataset is a fixed demo fixture and must be replaced by a governed ChEMBL or sponsor snapshot before scientific or portfolio decisions."
+  },
+  "benchmark_dataset": {
+    "path": "data/demo_pic50_benchmark.csv",
+    "source": "checked-in demo fixture",
+    "rows": 20,
+    "splits": [
+      "external",
+      "scaffold_test",
+      "train"
+    ]
+  },
+  "targets": {
+    "CHEMBL224": {
+      "target_name": "5HT2A",
+      "n_train": 6,
+      "metrics": {
+        "external": {
+          "r2": 0.9719,
+          "rmse": 0.021,
+          "mae": 0.0209,
+          "n": 2
+        },
+        "scaffold_test": {
+          "r2": 0.844,
+          "rmse": 0.1126,
+          "mae": 0.0806,
+          "n": 2
+        },
+        "train": {
+          "r2": 0.9829,
+          "rmse": 0.0398,
+          "mae": 0.0295,
+          "n": 6
+        }
+      },
+      "applicability_domain": {
+        "method": "descriptor_min_max",
+        "training_split": "train",
+        "features": {
+          "mol_wt": {
+            "min": 117.15099999999997,
+            "max": 248.37
+          },
+          "logp": {
+            "min": 0.5989999999999998,
+            "max": 2.3750400000000003
+          },
+          "tpsa": {
+            "min": 15.79,
+            "max": 66.48
+          },
+          "hbd": {
+            "min": 1.0,
+            "max": 3.0
+          },
+          "hba": {
+            "min": 0.0,
+            "max": 3.0
+          },
+          "rotatable_bonds": {
+            "min": 0.0,
+            "max": 6.0
+          },
+          "aromatic_rings": {
+            "min": 1.0,
+            "max": 2.0
+          },
+          "fraction_csp3": {
+            "min": 0.0,
+            "max": 0.5333333333333333
+          },
+          "qed": {
+            "min": 0.5439155908694729,
+            "max": 0.8380117513432375
+          }
+        },
+        "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+      }
+    },
+    "CHEMBL238": {
+      "target_name": "DAT",
+      "n_train": 6,
+      "metrics": {
+        "external": {
+          "r2": 0.7508,
+          "rmse": 0.6565,
+          "mae": 0.5892,
+          "n": 2
+        },
+        "scaffold_test": {
+          "r2": 0.68,
+          "rmse": 0.2602,
+          "mae": 0.2515,
+          "n": 2
+        },
+        "train": {
+          "r2": 0.991,
+          "rmse": 0.0447,
+          "mae": 0.0326,
+          "n": 6
+        }
+      },
+      "applicability_domain": {
+        "method": "descriptor_min_max",
+        "training_split": "train",
+        "features": {
+          "mol_wt": {
+            "min": 78.11399999999999,
+            "max": 248.37
+          },
+          "logp": {
+            "min": 0.5989999999999998,
+            "max": 3.073200000000001
+          },
+          "tpsa": {
+            "min": 0.0,
+            "max": 66.48
+          },
+          "hbd": {
+            "min": 0.0,
+            "max": 3.0
+          },
+          "hba": {
+            "min": 0.0,
+            "max": 3.0
+          },
+          "rotatable_bonds": {
+            "min": 0.0,
+            "max": 6.0
+          },
+          "aromatic_rings": {
+            "min": 1.0,
+            "max": 1.0
+          },
+          "fraction_csp3": {
+            "min": 0.0,
+            "max": 0.5333333333333333
+          },
+          "qed": {
+            "min": 0.4426283718993647,
+            "max": 0.8380117513432375
+          }
+        },
+        "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+      }
+    }
+  }
+}

@@ -6,9 +6,18 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import src.data.loader as loader_module
 from src.data.loader import ChEMBLDataLoader
 from src.features.featurizer import MolecularFeaturizer
+from src.utils.cache import DataCache
 from src.utils.config import config
+
+
+class UnpickleableActivities(list):
+    """List-like ChEMBL result that cannot be pickled as-is."""
+
+    def __getstate__(self):
+        raise NotImplementedError("client session cannot be pickled")
 
 
 class TestChEMBLDataLoader:
@@ -41,6 +50,56 @@ class TestChEMBLDataLoader:
         assert len(result) == 3
         assert all(result["pIC50"] > 0)
         assert all(result["pIC50"] < 15)  # Reasonable range
+
+    def test_fetch_from_chembl_caches_serializable_raw_records(self, tmp_path, monkeypatch):
+        rows = UnpickleableActivities(
+            [
+                {
+                    "molecule_chembl_id": "CHEMBL1",
+                    "canonical_smiles": "CCO",
+                    "standard_value": "1000",
+                }
+            ]
+        )
+
+        class FakeTarget:
+            @staticmethod
+            def filter(**kwargs):
+                return [{"target_chembl_id": kwargs["target_chembl_id"]}]
+
+        class FakeActivity:
+            @staticmethod
+            def filter(**kwargs):
+                return rows
+
+        class FakeClient:
+            target = FakeTarget()
+            activity = FakeActivity()
+
+        monkeypatch.setattr(loader_module, "new_client", FakeClient())
+        loader = ChEMBLDataLoader(cache_dir=str(tmp_path))
+
+        fetched = loader._fetch_from_chembl("CHEMBL238")
+        cached_raw = loader.cache.get_raw("CHEMBL238")
+
+        assert fetched.iloc[0]["canonical_smiles"] == "CCO"
+        assert cached_raw == list(rows)
+        assert not isinstance(cached_raw, UnpickleableActivities)
+
+    def test_data_cache_round_trips_without_parquet_engine(self, tmp_path):
+        cache = DataCache(data_dir=str(tmp_path))
+        frame = pd.DataFrame(
+            {
+                "canonical_smiles": ["CCO"],
+                "pIC50": [6.0],
+            }
+        )
+
+        cache.save("CHEMBL238", frame)
+        loaded = cache.get("CHEMBL238")
+
+        assert loaded is not None
+        pd.testing.assert_frame_equal(loaded, frame)
 
     def test_data_splitting(self):
         """Test data splitting methods."""

@@ -1,0 +1,82 @@
+{
+  "compound": "methylphenidate plus methylphenidate hydrochloride records",
+  "target": "CHEMBL238 DAT",
+  "analysis": {
+    "n_literature_ic50": 4,
+    "literature_ic50_nM": [
+      17.0,
+      19.9,
+      121.7,
+      79.0
+    ],
+    "literature_pIC50": [
+      7.7696,
+      7.7011,
+      6.9147,
+      7.1024
+    ],
+    "literature_mean_pIC50": 7.3719,
+    "literature_sd_pIC50": 0.4275,
+    "literature_sem_pIC50": 0.2137,
+    "literature_95ci_pIC50": [
+      6.6917,
+      8.0521
+    ],
+    "geometric_mean_ic50_nM": 42.4673,
+    "model_pIC50": 6.04,
+    "model_uncertainty": 0.87,
+    "model_predicted_ic50_nM": 912.0108,
+    "model_minus_literature_mean_pIC50": -1.3319,
+    "one_sample_t": -6.2317,
+    "two_sided_p": 0.0083,
+    "inactive_rows_by_rule": 0,
+    "applicability_domain_in_domain": true,
+    "device": "cpu"
+  },
+  "effect_size": {
+    "cohen_dz": -3.1159,
+    "basis": "model pIC50 minus literature mean, divided by literature sample SD"
+  },
+  "power": {
+    "alpha": 0.05,
+    "method": "two-sided one-sample t-test power using a noncentral t distribution",
+    "observed_two_sided_alpha_0_05": 0.9754,
+    "caveat": "Post-hoc power from n=4 literature IC50 values; use as a signal, not as a confirmatory design calculation."
+  },
+  "benchmark_dataset": {
+    "path": "data/chembl238_pic50_snapshot.csv",
+    "source": "ChEMBL",
+    "rows": 2382,
+    "splits": [
+      "external",
+      "scaffold_test",
+      "train"
+    ]
+  },
+  "benchmark_metrics": {
+    "CHEMBL238": {
+      "external": {
+        "r2": 0.2062,
+        "rmse": 1.0197,
+        "mae": 0.8295,
+        "n": 261
+      },
+      "scaffold_test": {
+        "r2": 0.3263,
+        "rmse": 0.8699,
+        "mae": 0.709,
+        "n": 359
+      },
+      "train": {
+        "r2": 0.245,
+        "rmse": 1.0474,
+        "mae": 0.8553,
+        "n": 1762
+      }
+    }
+  },
+  "source_files": {
+    "activity_analysis": "artifacts/methylphenidate_chembl238_activity_analysis.json",
+    "cpu_benchmark": "artifacts/chembl238_cpu_benchmark.json"
+  }
+}

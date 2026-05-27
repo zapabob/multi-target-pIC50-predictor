@@ -163,6 +163,12 @@ data/
 datasets/
 raw_data/
 processed_data/
+!data/
+!data/demo_pic50_benchmark.csv
+!models/
+!models/demo_cpu_pic50_model.json
+!artifacts/
+!artifacts/demo_cpu_benchmark.json
 
 # Log Files
 *.log
@@ -220,6 +226,8 @@ checkpoint/
 
 # Model Artifacts
 artifacts/
+!artifacts/
+!artifacts/demo_cpu_benchmark.json
 models/trained/
 models/checkpoints/
 models/artifacts/
@@ -259,6 +267,9 @@ backups/
 images/
 pictures/
 photos/
+!docs/assets/
+!docs/assets/methylphenidate_chembl238_errorbar.png
+!docs/assets/methylphenidate_chembl238_readme_stats.json
 
 # Large Video Files
 *.mp4

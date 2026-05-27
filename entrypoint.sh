@@ -55,16 +55,12 @@ for i in range(max_retries):
             time.sleep(2)
 "
 
-# ヘルスチェック
-echo "🏥 Running health checks..."
+# API import check
+echo "🏥 Checking API startup imports..."
 python -c "
-from src.health import HealthChecker
-checker = HealthChecker()
-status = checker.check_all()
-if status['overall'] == 'healthy':
-    print('All health checks passed')
-else:
-    print('Health check warnings:', status)
+from src.api.app import create_app
+create_app()
+print('API app import successful')
 "
 
 # アプリケーション起動

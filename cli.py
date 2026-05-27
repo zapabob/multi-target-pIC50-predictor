@@ -29,6 +29,44 @@ def train(args):
 
 
 def predict(args):
+    if Path(args.model).suffix.lower() == ".json":
+        from src.models.demo_cpu import CPUDemoPIC50Model
+
+        model = CPUDemoPIC50Model.from_file(args.model)
+        smiles_list = []
+        if args.smiles:
+            smiles_list.append(args.smiles)
+        if args.input:
+            with open(args.input, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        smiles_list.append(line)
+        if not smiles_list:
+            print("No SMILES provided")
+            return
+
+        if args.uncertainty:
+            print("SMILES\tTarget\tPredicted_pIC50\tUncertainty\tApplicabilityDomain")
+        else:
+            print("SMILES\tTarget\tPredicted_pIC50")
+
+        for sm in smiles_list:
+            try:
+                result = model.predict(sm, target=args.target)
+            except ValueError as exc:
+                print(f"{sm}\tPrediction failed: {exc}")
+                continue
+            if args.uncertainty:
+                domain = "in" if result.applicability_domain["in_domain"] else "out"
+                print(
+                    f"{sm}\t{result.target}\t{result.pIC50_prediction:.4f}\t"
+                    f"{result.uncertainty:.4f}\t{domain}"
+                )
+            else:
+                print(f"{sm}\t{result.target}\t{result.pIC50_prediction:.4f}")
+        return
+
     DATPredictor, _ = load_dat_predictor_tools()
     predictor = DATPredictor()
     predictor.load_model(args.model)
@@ -36,7 +74,7 @@ def predict(args):
     if args.smiles:
         smiles_list.append(args.smiles)
     if args.input:
-        with open(args.input) as f:
+        with open(args.input, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if line:
@@ -76,9 +114,17 @@ def assess(args):
 
     predictor = None
     if args.model:
-        DATPredictor, _ = load_dat_predictor_tools()
-        predictor = DATPredictor()
-        predictor.load_model(args.model)
+        if Path(args.model).suffix.lower() == ".json":
+            from src.models.demo_cpu import CPUDemoPIC50Model, CPUDemoPredictorAdapter
+
+            predictor = CPUDemoPredictorAdapter(
+                CPUDemoPIC50Model.from_file(args.model),
+                args.target,
+            )
+        else:
+            DATPredictor, _ = load_dat_predictor_tools()
+            predictor = DATPredictor()
+            predictor.load_model(args.model)
 
     pipeline = CompoundAssessmentPipeline(
         predictor=predictor,
@@ -408,6 +454,40 @@ def benchmark(args):
         print(f"\n✅ Results saved to {args.output}")
 
 
+def build_demo_cpu_model(args):
+    """Build the CPU-only demo model and benchmark report."""
+    from src.models.demo_cpu import build_demo_cpu_artifacts
+
+    model_path, report_path = build_demo_cpu_artifacts(
+        Path(args.dataset),
+        Path(args.output),
+        Path(args.report),
+    )
+    print(f"CPU demo model saved to {model_path}")
+    print(f"Benchmark report saved to {report_path}")
+
+
+def build_chembl_snapshot(args):
+    """Build a fixed ChEMBL pIC50 snapshot CSV and manifest."""
+    from src.data.chembl_snapshot import build_chembl_pic50_snapshot
+
+    targets = [target.strip() for target in args.targets.split(",") if target.strip()]
+    result = build_chembl_pic50_snapshot(
+        targets=targets,
+        output_path=Path(args.output),
+        manifest_path=Path(args.manifest),
+        force_refresh=args.force_refresh,
+        max_rows_per_target=args.max_rows_per_target,
+        random_seed=args.random_seed,
+        scaffold_test_fraction=args.scaffold_test_fraction,
+        external_fraction=args.external_fraction,
+    )
+    print(f"ChEMBL snapshot saved to {result.csv_path}")
+    print(f"Manifest saved to {result.manifest_path}")
+    print(f"Rows: {result.row_count}")
+    print(f"CSV sha256: {result.csv_sha256}")
+
+
 parser = argparse.ArgumentParser(
     description="DAT/GPCR/Opioid prediction CLI with TxGemma AI integration. "
     "Supported targets: DAT, 5HT2A, CB1, CB2, mu-opioid, delta-opioid, kappa-opioid."
@@ -430,6 +510,7 @@ train_parser.set_defaults(func=train)
 # 既存のpredictコマンド（拡張）
 predict_parser = subparsers.add_parser("predict", help="predict pIC50 with uncertainty")
 predict_parser.add_argument("--model", required=True, help="path to trained model")
+predict_parser.add_argument("--target", default="CHEMBL238", help="target label or ChEMBL target ID")
 predict_parser.add_argument("--smiles", help="SMILES string")
 predict_parser.add_argument("--input", help="path to file with SMILES, one per line")
 predict_parser.add_argument(
@@ -517,6 +598,61 @@ benchmark_parser.add_argument("--cross-validate", action="store_true", help="use
 benchmark_parser.add_argument("--output", help="output JSON file for results")
 benchmark_parser.set_defaults(func=benchmark)
 
+chembl_snapshot_parser = subparsers.add_parser(
+    "build-chembl-snapshot",
+    help="build a fixed ChEMBL pIC50 benchmark snapshot and manifest",
+)
+chembl_snapshot_parser.add_argument(
+    "--targets",
+    default="CHEMBL238,CHEMBL224,CHEMBL218,CHEMBL253,CHEMBL233,CHEMBL236,CHEMBL237",
+    help="comma-separated ChEMBL target IDs",
+)
+chembl_snapshot_parser.add_argument(
+    "--output",
+    default="data/chembl_pic50_snapshot.csv",
+    help="output snapshot CSV path",
+)
+chembl_snapshot_parser.add_argument(
+    "--manifest",
+    default="artifacts/chembl_pic50_snapshot.manifest.json",
+    help="output manifest JSON path",
+)
+chembl_snapshot_parser.add_argument(
+    "--max-rows-per-target",
+    type=int,
+    help="optional per-target row cap for dry runs",
+)
+chembl_snapshot_parser.add_argument(
+    "--force-refresh",
+    action="store_true",
+    help="refresh ChEMBL cache before writing the snapshot",
+)
+chembl_snapshot_parser.add_argument("--random-seed", type=int, default=42)
+chembl_snapshot_parser.add_argument("--scaffold-test-fraction", type=float, default=0.15)
+chembl_snapshot_parser.add_argument("--external-fraction", type=float, default=0.15)
+chembl_snapshot_parser.set_defaults(func=build_chembl_snapshot)
+
+demo_cpu_parser = subparsers.add_parser(
+    "build-demo-cpu-model",
+    help="build CPU-only demo model and fixed benchmark report",
+)
+demo_cpu_parser.add_argument(
+    "--dataset",
+    default="data/demo_pic50_benchmark.csv",
+    help="fixed benchmark CSV path",
+)
+demo_cpu_parser.add_argument(
+    "--output",
+    default="models/demo_cpu_pic50_model.json",
+    help="output CPU model JSON path",
+)
+demo_cpu_parser.add_argument(
+    "--report",
+    default="artifacts/demo_cpu_benchmark.json",
+    help="output benchmark report JSON path",
+)
+demo_cpu_parser.set_defaults(func=build_demo_cpu_model)
+
 # 新機能：TxGemmaダウンロード
 download_parser = subparsers.add_parser(
     "download-txgemma", help="download TxGemma-9B-Chat-GGUF from Hugging Face"
@@ -538,6 +674,10 @@ Basic Commands:
   active-learning    Suggest next compounds to test
   chat               Interactive chat with TxGemma AI
   benchmark          Run benchmark evaluation
+  build-chembl-snapshot
+                     Build fixed ChEMBL pIC50 snapshot and manifest
+  build-demo-cpu-model
+                     Build CPU-only demo model and benchmark report
   download-txgemma   Download TxGemma-9B-Chat-GGUF from Hugging Face
 
 Examples:
@@ -553,8 +693,14 @@ Examples:
   # Get uncertainty predictions
   python cli.py predict --model model.pt --smiles "CC(C)Nc1ncnc2..." --uncertainty
 
+  # CPU-only demo prediction
+  python cli.py predict --model models/demo_cpu_pic50_model.json --target CHEMBL238 --smiles "CC(=O)OC1=CC=CC=C1C(=O)O" --uncertainty
+
   # Integrated discovery assessment
   python cli.py assess --smiles "CC(=O)OC1=CC=CC=C1C(=O)O" --output assessment.json
+
+  # Rebuild the fixed CPU benchmark artifacts
+  python cli.py build-demo-cpu-model
 
   # Active Learning suggestions
   python cli.py active-learning --model model.pt --unlabeled-data compounds.txt --n-suggestions 20
@@ -564,6 +710,9 @@ Examples:
 
   # Benchmark all targets
   python cli.py benchmark --cross-validate --output results.json
+
+  # Freeze a ChEMBL evaluation snapshot
+  python cli.py build-chembl-snapshot --targets CHEMBL238,CHEMBL224 --output data/chembl_pic50_snapshot.csv --manifest artifacts/chembl_pic50_snapshot.manifest.json
 
   # Download TxGemma-9B-Chat-GGUF
   python cli.py download-txgemma

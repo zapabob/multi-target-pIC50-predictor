@@ -11,6 +11,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV CUDA_VISIBLE_DEVICES=0
+ENV PIC50_MODEL_PATH=/app/models/demo_cpu_pic50_model.json
 
 # システムパッケージ更新・インストール
 RUN apt-get update && apt-get install -y \
@@ -82,4 +83,4 @@ EXPOSE 8000 8001
 
 # エントリーポイント
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["python", "main.py", "--mode", "production"]
+CMD ["uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8000"]

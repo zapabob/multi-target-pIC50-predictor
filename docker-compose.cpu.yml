@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  pic50-api-cpu:
+    build: .
+    container_name: pic50-api-cpu
+    entrypoint: ["/bin/bash", "-lc"]
+    command: "uvicorn src.api.app:app --host 0.0.0.0 --port 8000"
+    environment:
+      - ENV=production
+      - CUDA_VISIBLE_DEVICES=
+      - PIC50_MODEL_PATH=/app/models/demo_cpu_pic50_model.json
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./models:/app/models:ro
+      - ./artifacts:/app/artifacts
+    restart: unless-stopped

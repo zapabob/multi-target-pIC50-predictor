@@ -1,0 +1,238 @@
+{
+  "model_version": "demo-cpu-ridge-v1",
+  "model_kind": "cpu_descriptor_ridge",
+  "device": "cpu",
+  "feature_names": [
+    "mol_wt",
+    "logp",
+    "tpsa",
+    "hbd",
+    "hba",
+    "rotatable_bonds",
+    "aromatic_rings",
+    "fraction_csp3",
+    "qed"
+  ],
+  "context_of_use": {
+    "intended_use": "CPU-only early discovery demo for small-molecule pIC50 triage.",
+    "decision_role": "research_triage_only",
+    "not_for": [
+      "clinical_decision",
+      "regulatory_submission",
+      "manufacturing_release",
+      "patient_care"
+    ],
+    "endpoint": "Target-specific pIC50 derived from IC50 nM values. The bundled dataset is a fixed demo fixture and must be replaced by a governed ChEMBL or sponsor snapshot before scientific or portfolio decisions."
+  },
+  "training": {
+    "algorithm": "sklearn.linear_model.Ridge",
+    "alpha": 1.0,
+    "dataset_path": "data/demo_pic50_benchmark.csv",
+    "dataset_source": "checked-in demo fixture",
+    "random_seed": null
+  },
+  "targets": {
+    "CHEMBL224": {
+      "target_name": "5HT2A",
+      "coefficients": [
+        0.11260571697510824,
+        0.09876421229011026,
+        0.06554807309290858,
+        0.08082985608605453,
+        0.03579006264753026,
+        0.02573365076618843,
+        0.1232754324478152,
+        -0.00758599984514653,
+        0.04070109432519527
+      ],
+      "intercept": 4.915,
+      "scaler_mean": [
+        162.72066666666663,
+        1.5622566666666666,
+        40.74666666666667,
+        1.8333333333333333,
+        1.5,
+        2.3333333333333335,
+        1.5,
+        0.2388888888888889,
+        0.6478627569616057
+      ],
+      "scaler_scale": [
+        43.62194430431649,
+        0.5975079910669722,
+        18.38080127621088,
+        0.8975274678557508,
+        0.9574271077563381,
+        1.7950549357115013,
+        0.5,
+        0.1565444755956152,
+        0.09984095830553694
+      ],
+      "residual_rmse": 0.25,
+      "applicability_domain": {
+        "method": "descriptor_min_max",
+        "training_split": "train",
+        "features": {
+          "mol_wt": {
+            "min": 117.15099999999997,
+            "max": 248.37
+          },
+          "logp": {
+            "min": 0.5989999999999998,
+            "max": 2.3750400000000003
+          },
+          "tpsa": {
+            "min": 15.79,
+            "max": 66.48
+          },
+          "hbd": {
+            "min": 1.0,
+            "max": 3.0
+          },
+          "hba": {
+            "min": 0.0,
+            "max": 3.0
+          },
+          "rotatable_bonds": {
+            "min": 0.0,
+            "max": 6.0
+          },
+          "aromatic_rings": {
+            "min": 1.0,
+            "max": 2.0
+          },
+          "fraction_csp3": {
+            "min": 0.0,
+            "max": 0.5333333333333333
+          },
+          "qed": {
+            "min": 0.5439155908694729,
+            "max": 0.8380117513432375
+          }
+        },
+        "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+      },
+      "metrics": {
+        "external": {
+          "r2": 0.9719,
+          "rmse": 0.021,
+          "mae": 0.0209,
+          "n": 2
+        },
+        "scaffold_test": {
+          "r2": 0.844,
+          "rmse": 0.1126,
+          "mae": 0.0806,
+          "n": 2
+        },
+        "train": {
+          "r2": 0.9829,
+          "rmse": 0.0398,
+          "mae": 0.0295,
+          "n": 6
+        }
+      }
+    },
+    "CHEMBL238": {
+      "target_name": "DAT",
+      "coefficients": [
+        0.11307589502472692,
+        0.13549306729618063,
+        0.013227402121342872,
+        -0.0247923004512652,
+        -0.0019687219177377605,
+        0.09171889490403974,
+        0.0,
+        0.0859668429410271,
+        0.07042866953180643
+      ],
+      "intercept": 4.543333333333333,
+      "scaler_mean": [
+        167.21516666666668,
+        1.6562233333333334,
+        40.995,
+        1.3333333333333333,
+        1.8333333333333333,
+        2.6666666666666665,
+        1.0,
+        0.2676638176638177,
+        0.6388057243869537
+      ],
+      "scaler_scale": [
+        53.72471266688068,
+        0.8509666065063244,
+        22.200744544571773,
+        0.9428090415820634,
+        1.0671873729054748,
+        1.8856180831641267,
+        1.0,
+        0.18481718860262225,
+        0.14621940107681142
+      ],
+      "residual_rmse": 0.2602,
+      "applicability_domain": {
+        "method": "descriptor_min_max",
+        "training_split": "train",
+        "features": {
+          "mol_wt": {
+            "min": 78.11399999999999,
+            "max": 248.37
+          },
+          "logp": {
+            "min": 0.5989999999999998,
+            "max": 3.073200000000001
+          },
+          "tpsa": {
+            "min": 0.0,
+            "max": 66.48
+          },
+          "hbd": {
+            "min": 0.0,
+            "max": 3.0
+          },
+          "hba": {
+            "min": 0.0,
+            "max": 3.0
+          },
+          "rotatable_bonds": {
+            "min": 0.0,
+            "max": 6.0
+          },
+          "aromatic_rings": {
+            "min": 1.0,
+            "max": 1.0
+          },
+          "fraction_csp3": {
+            "min": 0.0,
+            "max": 0.5333333333333333
+          },
+          "qed": {
+            "min": 0.4426283718993647,
+            "max": 0.8380117513432375
+          }
+        },
+        "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+      },
+      "metrics": {
+        "external": {
+          "r2": 0.7508,
+          "rmse": 0.6565,
+          "mae": 0.5892,
+          "n": 2
+        },
+        "scaffold_test": {
+          "r2": 0.68,
+          "rmse": 0.2602,
+          "mae": 0.2515,
+          "n": 2
+        },
+        "train": {
+          "r2": 0.991,
+          "rmse": 0.0447,
+          "mae": 0.0326,
+          "n": 6
+        }
+      }
+    }
+  }
+}

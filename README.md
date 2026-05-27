@@ -4,10 +4,13 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 
-A drug-discovery research toolkit for multi-target pIC50 prediction, compound
-triage, and early medicinal chemistry decision support.
+A CPU-runnable drug-discovery MVP for target-specific pIC50 prediction,
+compound triage, and early medicinal chemistry decision support. The current
+pharma-facing path is deliberately narrow: fixed ChEMBL snapshots, scaffold and
+external splits, uncertainty, applicability domain, and a FastAPI surface that a
+sponsor or reviewer can test without GPU access.
 
-The project started as a DAT activity predictor and now includes a modular
+The project started as a DAT activity predictor and now demonstrates a modular
 discovery pipeline for:
 
 - multi-target pIC50 modeling across DAT, 5-HT2A, CB1, CB2, and opioid receptors
@@ -33,6 +36,56 @@ regulatory, or manufacturing decision system.
 | Repro command | `uv sync` then `uv run python cli.py train --target CHEMBL238 --optimize` and `uv run python cli.py assess --smiles "CCN(CC)CC"` |
 | Metrics to inspect | Unit/integration tests cover model, pipeline, discovery extension, and structure integration contracts; promote benchmark tables here when a calibrated public run is available |
 | Limitations | Research triage only; pIC50, ADMET, docking, and synthesis outputs require calibration and expert review before real-world decisions |
+
+## Pharma MVP Evidence Snapshot
+
+This README is written for four reviewers at once:
+
+| Audience | What to inspect | Why it matters |
+| --- | --- | --- |
+| Pharma R&D / translational science | Fixed CHEMBL238 snapshot, methylphenidate literature check, target-level R2/RMSE/MAE, context of use | Shows the model is framed as research-use decision support, with evidence separated from regulatory claims |
+| MLOps | Dataset manifest, split policy, checksum, JSON model artifact, CPU reproducibility, `/health` endpoint | Makes data lineage, reproducibility, deployment shape, and lifecycle hooks visible |
+| LLMOps | Structured API outputs, model version, uncertainty, applicability-domain status, research-only language | Lets an LLM copilot quote bounded evidence instead of inventing model confidence or use claims |
+| AI engineering | RDKit descriptors, scikit-learn CPU baseline, FastAPI, tests, Docker CPU service | Gives a small but complete reference path from data to model to service |
+
+Current CHEMBL238 CPU benchmark:
+
+| Split | n | R2 | RMSE | MAE |
+| --- | ---: | ---: | ---: | ---: |
+| train | 1,762 | 0.2450 | 1.0474 | 0.8553 |
+| scaffold_test | 359 | 0.3263 | 0.8699 | 0.7090 |
+| external | 261 | 0.2062 | 1.0197 | 0.8295 |
+
+Methylphenidate activity check against CHEMBL238 DAT literature values:
+
+![Methylphenidate CHEMBL238 error-bar validation](docs/assets/methylphenidate_chembl238_errorbar.png)
+
+| Statistic | Value |
+| --- | --- |
+| Literature IC50 values | 17.0, 19.9, 79.0, 121.7 nM |
+| Literature pIC50 mean | 7.3719 |
+| Literature pIC50 95% CI | 6.6917 to 8.0521 |
+| Geometric mean IC50 | 42.4673 nM |
+| CPU model prediction | pIC50 6.0400, IC50 912.0108 nM |
+| Model uncertainty / applicability domain | 0.8700, in-domain |
+| Model minus literature mean | -1.3319 log units |
+| One-sample t-test vs literature mean | t(3) = -6.2317, two-sided p = 0.008333 |
+| Effect size | Cohen dz = -3.1159 |
+| Observed power | 0.9754 at alpha = 0.05, two-sided |
+| Inactive-rule result | 0 methylphenidate rows marked inactive under IQL / qualitative inactive or >=1000 uM rule |
+
+Interpretation: methylphenidate is literature-active on CHEMBL238, while the
+small CPU Ridge baseline underpredicts potency by about 1.33 log units. That is
+useful MVP evidence because it exposes the full evaluation loop, not because it
+claims production-grade accuracy. The next pharma evaluation step is a governed
+multi-target ChEMBL or sponsor snapshot with locked data lineage, stronger
+models, calibration, drift monitoring, and lifecycle change control.
+
+The graph and README statistics are regenerated from local JSON evidence:
+
+```bash
+uv run python -B scripts/build_pharma_mvp_readme_assets.py
+```
 
 ## Repository Layout
 
@@ -103,6 +156,58 @@ uv pip install "apache-airflow==3.2.1" --constraint "https://raw.githubuserconte
 See [docs/uv_environment.md](docs/uv_environment.md) for more details.
 
 ## Quick Start
+
+### CPU-Only Pharma MVP Demo
+
+The repository includes a small CPU-only demo model for portfolio and stakeholder
+walkthroughs. It uses a fixed descriptor benchmark, a scikit-learn Ridge model,
+and checked-in JSON artifacts, so it does not require CUDA or a GPU.
+
+Build or refresh the demo artifacts:
+
+```bash
+uv run python -B scripts/build_demo_cpu_model.py
+```
+
+Run a CPU-only prediction:
+
+```bash
+uv run python -B cli.py predict \
+  --model models/demo_cpu_pic50_model.json \
+  --target CHEMBL238 \
+  --smiles "CC(=O)OC1=CC=CC=C1C(=O)O" \
+  --uncertainty
+```
+
+Start the FastAPI demo service:
+
+```bash
+uv run uvicorn src.api.app:app --host 127.0.0.1 --port 8000
+```
+
+Available endpoints:
+
+- `GET /health`
+- `POST /predict`
+- `POST /assess`
+
+The CPU demo is intentionally scoped as research triage and portfolio evidence.
+It is not a clinical, regulatory, manufacturing, or patient-care decision
+system. Replace `data/demo_pic50_benchmark.csv` with a governed ChEMBL or sponsor
+snapshot before using the benchmark for scientific claims.
+
+Freeze a ChEMBL pIC50 evaluation snapshot for a more serious pharma review:
+
+```bash
+uv run python -B cli.py build-chembl-snapshot \
+  --targets CHEMBL238,CHEMBL224 \
+  --output data/chembl_pic50_snapshot.csv \
+  --manifest artifacts/chembl_pic50_snapshot.manifest.json
+```
+
+The snapshot command writes a CSV plus a JSON manifest containing filters, split
+policy, per-target counts, and a SHA-256 checksum. Generated ChEMBL snapshots are
+local evaluation artifacts and are not committed by default.
 
 Run a no-model compound assessment. This produces ADMET and synthesis outputs,
 and can optionally include 3D, reaction, and image features.
@@ -292,6 +397,52 @@ uv run ruff format . --check
 The current codebase still contains legacy Ruff issues outside the newly added
 discovery modules. Treat a full-project Ruff cleanup as a separate refactoring
 task.
+
+## Pharma MVP Readiness
+
+The current repo is suitable as a portfolio-grade pharma MVP, not as a validated
+QSAR product. It has the minimum pieces a serious reviewer expects to see:
+
+- Clear context of use: research triage and decision support only; not clinical,
+  regulatory, manufacturing, or patient-care decision-making.
+- Fixed data path: demo fixture plus a CHEMBL238 ChEMBL snapshot with manifest,
+  split policy, row counts, and checksum.
+- Risk-based performance report: target-level R2, RMSE, and MAE for train,
+  scaffold-test, and external splits.
+- Statistical sanity check: methylphenidate literature IC50 comparison with
+  error bars, p-value, effect size, and observed power.
+- Applicability domain and uncertainty: every CPU prediction returns domain
+  status and uncertainty for review-time triage.
+- API contract: `/health`, `/predict`, and `/assess` expose model status,
+  prediction, and compound assessment through FastAPI.
+- MLOps shape: JSON model artifact, benchmark JSON, reproducible CLI commands,
+  Docker CPU service, tests, and explicit residual risks.
+- LLMOps shape: structured model outputs and bounded research-use language make
+  the service safer to wrap with an LLM assistant or report generator.
+
+What this MVP proves:
+
+- The evidence loop is implemented end to end on CPU.
+- The evaluation is honest about scaffold/external generalization.
+- A known active compound can be compared to literature with statistical
+  outputs rather than a single anecdotal prediction.
+- Model limitations are visible: the current CPU baseline underpredicts
+  methylphenidate, so the demo invites model improvement instead of hiding it.
+
+What remains before pharma-grade technical diligence:
+
+- Governed ChEMBL or sponsor snapshot with frozen version, license review, and
+  data-quality gates.
+- Stronger baselines and calibrated uncertainty across multiple target families.
+- External validation by target and chemical series, including assay-protocol
+  stratification.
+- Model registry, approval workflow, drift monitoring, rollback, audit logging,
+  and lifecycle management.
+- Mechanistic interpretation where feasible, aligned with QSAR validation
+  expectations.
+
+See [docs/pharma_mvp_cpu_demo.md](docs/pharma_mvp_cpu_demo.md) for the model
+card-style details, regulatory alignment notes, and CPU deployment commands.
 
 ## Docker Production Stack
 
