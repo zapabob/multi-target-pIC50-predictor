@@ -219,6 +219,49 @@ def train_gnn(args):
         print(f"❌ GNN training failed: {e}")
 
 
+def train_elt(args):
+    """Train the elastic-looped Transformer pIC50 model."""
+    DATPredictor, _ = load_dat_predictor_tools()
+    import pytorch_lightning as pl
+    import torch
+    from torch.utils.data import DataLoader, TensorDataset
+
+    from src.models.elastic_looped_transformer import LitElasticLoopedPIC50
+
+    print("Training elastic-looped Transformer model...")
+    predictor = DATPredictor()
+    df = predictor.fetch_data(target_chembl_id=args.target)
+    predictor.prepare_data(df)
+
+    train_dataset = TensorDataset(
+        torch.tensor(predictor.X_train, dtype=torch.float32),
+        torch.tensor(predictor.y_train, dtype=torch.float32),
+    )
+    val_dataset = TensorDataset(
+        torch.tensor(predictor.X_val, dtype=torch.float32),
+        torch.tensor(predictor.y_val, dtype=torch.float32),
+    )
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size)
+
+    model = LitElasticLoopedPIC50(
+        input_dim=predictor.X_train.shape[1],
+        hidden_dim=args.hidden_dim,
+        token_count=args.token_count,
+        num_heads=args.num_heads,
+        dropout=args.dropout,
+        default_num_loops=args.loop_count,
+        learning_rate=args.learning_rate,
+    )
+    accelerator = "gpu" if torch.cuda.is_available() else "cpu"
+    trainer = pl.Trainer(max_epochs=args.epochs, accelerator=accelerator)
+    trainer.fit(model, train_loader, val_loader)
+
+    output_path = Path(args.output or f"elt_model_{args.target}.ckpt")
+    trainer.save_checkpoint(str(output_path))
+    print(f"Elastic-looped Transformer model saved to {output_path}")
+
+
 def train_ensemble(args):
     """アンサンブルモデルの学習"""
     try:
@@ -552,6 +595,23 @@ gnn_parser.add_argument("--epochs", type=int, default=100, help="number of epoch
 gnn_parser.add_argument("--batch-size", type=int, default=32, help="batch size")
 gnn_parser.set_defaults(func=train_gnn)
 
+# New feature: elastic-looped Transformer training
+elt_parser = subparsers.add_parser(
+    "train-elt",
+    help="train elastic-looped Transformer model",
+)
+elt_parser.add_argument("--target", default="CHEMBL238", help="ChEMBL target ID")
+elt_parser.add_argument("--output", help="output checkpoint path")
+elt_parser.add_argument("--hidden-dim", type=int, default=128, help="hidden dimension")
+elt_parser.add_argument("--token-count", type=int, default=4, help="descriptor token count")
+elt_parser.add_argument("--num-heads", type=int, default=4, help="attention heads")
+elt_parser.add_argument("--loop-count", type=int, default=4, help="default elastic loop count")
+elt_parser.add_argument("--dropout", type=float, default=0.1, help="dropout")
+elt_parser.add_argument("--learning-rate", type=float, default=1e-3, help="learning rate")
+elt_parser.add_argument("--epochs", type=int, default=50, help="number of epochs")
+elt_parser.add_argument("--batch-size", type=int, default=32, help="batch size")
+elt_parser.set_defaults(func=train_elt)
+
 # 新機能：アンサンブル学習
 ensemble_parser = subparsers.add_parser("train-ensemble", help="train ensemble model")
 ensemble_parser.add_argument("--target", default="CHEMBL238", help="ChEMBL target ID")
@@ -670,6 +730,7 @@ Basic Commands:
   predict            Predict pIC50 values
   assess             Run pIC50/3D/ADMET/synthesis/reaction triage
   train-gnn          Train Graph Neural Network
+  train-elt          Train elastic-looped Transformer model
   train-ensemble     Train ensemble model
   active-learning    Suggest next compounds to test
   chat               Interactive chat with TxGemma AI
@@ -686,6 +747,9 @@ Examples:
 
   # Train GNN model
   python cli.py train-gnn --target CHEMBL224 --hidden-dim 256
+
+  # Train ELT model with selectable loop budget
+  python cli.py train-elt --target CHEMBL238 --loop-count 4 --epochs 20
 
   # Train ensemble
   python cli.py train-ensemble --include-xgboost --include-gnn

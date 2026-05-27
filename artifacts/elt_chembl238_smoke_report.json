@@ -1,0 +1,114 @@
+{
+  "model_kind": "elastic_looped_transformer_pic50",
+  "device": "cpu",
+  "target": "CHEMBL238",
+  "dataset": {
+    "path": "data/chembl238_pic50_snapshot.csv",
+    "rows": 2382,
+    "splits": [
+      "external",
+      "scaffold_test",
+      "train"
+    ]
+  },
+  "training": {
+    "epochs": 5,
+    "hidden_dim": 64,
+    "token_count": 4,
+    "num_heads": 4,
+    "loop_count": 4,
+    "batch_size": 64,
+    "learning_rate": 0.0003,
+    "random_seed": 42,
+    "losses": [
+      30.71449,
+      14.648081,
+      7.014874,
+      2.925298,
+      1.861652
+    ]
+  },
+  "metrics": {
+    "external": {
+      "n": 261,
+      "r2": -0.0213,
+      "rmse": 1.1566,
+      "mae": 0.9751
+    },
+    "scaffold_test": {
+      "n": 359,
+      "r2": -0.0227,
+      "rmse": 1.0718,
+      "mae": 0.8835
+    },
+    "train": {
+      "n": 1762,
+      "r2": 0.0023,
+      "rmse": 1.2041,
+      "mae": 1.0153
+    }
+  },
+  "methylphenidate_smiles": "COC(=O)C(c1ccccc1)C1CCCCN1",
+  "methylphenidate_loop_predictions": {
+    "1": {
+      "pIC50_prediction": 4.7812,
+      "uncertainty": 0.6351
+    },
+    "2": {
+      "pIC50_prediction": 6.0679,
+      "uncertainty": 0.6477
+    },
+    "3": {
+      "pIC50_prediction": 6.3114,
+      "uncertainty": 0.6528
+    },
+    "4": {
+      "pIC50_prediction": 6.353,
+      "uncertainty": 0.6522
+    }
+  },
+  "methylphenidate_literature_comparison": {
+    "analysis_path": "artifacts/methylphenidate_chembl238_activity_analysis.json",
+    "literature_mean_pIC50": 7.3719,
+    "cpu_ridge_pIC50": 6.04,
+    "loops": {
+      "1": {
+        "model_minus_literature_mean_pIC50": -2.5907,
+        "fold_weaker_than_literature": 389.6727,
+        "gain_vs_cpu_ridge_pIC50": -1.2588,
+        "fold_closer_than_cpu_ridge": 0.0551
+      },
+      "2": {
+        "model_minus_literature_mean_pIC50": -1.304,
+        "fold_weaker_than_literature": 20.1372,
+        "gain_vs_cpu_ridge_pIC50": 0.0279,
+        "fold_closer_than_cpu_ridge": 1.0664
+      },
+      "3": {
+        "model_minus_literature_mean_pIC50": -1.0605,
+        "fold_weaker_than_literature": 11.4948,
+        "gain_vs_cpu_ridge_pIC50": 0.2714,
+        "fold_closer_than_cpu_ridge": 1.8681
+      },
+      "4": {
+        "model_minus_literature_mean_pIC50": -1.0189,
+        "fold_weaker_than_literature": 10.4448,
+        "gain_vs_cpu_ridge_pIC50": 0.313,
+        "fold_closer_than_cpu_ridge": 2.0559
+      }
+    }
+  },
+  "reference": {
+    "github_repo": "zapabob/elastic-looped-transformer",
+    "github_url": "https://github.com/zapabob/elastic-looped-transformer",
+    "arxiv": "https://arxiv.org/abs/2604.09168"
+  },
+  "context_of_use": {
+    "decision_role": "research_triage_only",
+    "not_for": [
+      "clinical_decision",
+      "regulatory_submission",
+      "patient_care"
+    ]
+  }
+}

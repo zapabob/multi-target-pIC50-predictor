@@ -15,6 +15,8 @@ discovery pipeline for:
 
 - multi-target pIC50 modeling across DAT, 5-HT2A, CB1, CB2, and opioid receptors
 - RDKit descriptors, ECFP4/MACCS fingerprints, SMARTS flags, and graph features
+- elastic-looped Transformer regression as a third deep-learning path after
+  descriptor Transformer and GNN baselines
 - ETKDG 3D conformer generation with geometry descriptors
 - ADMET and developability triage
 - synthetic accessibility scoring with SA score and SCScore-style proxies
@@ -30,12 +32,50 @@ regulatory, or manufacturing decision system.
 
 | Field | Current public evidence |
 | --- | --- |
-| Model surface | Transformer pIC50 workflow, optional GNN adapters, ensemble hooks, uncertainty reporting, and no-model compound assessment paths |
+| Model surface | Transformer pIC50 workflow, optional GNN adapters, elastic-looped Transformer path, ensemble hooks, uncertainty reporting, and no-model compound assessment paths |
 | Dataset surface | ChEMBL-backed target activity workflows for DAT, 5-HT2A, CB1, CB2, and opioid receptors, plus SMILES file triage inputs |
 | Feature engineering | RDKit descriptors, ECFP4/MACCS fingerprints, SMARTS flags, ETKDGv3 3D descriptors, graph features, ADMET proxies, and synthetic accessibility scoring |
 | Repro command | `uv sync` then `uv run python cli.py train --target CHEMBL238 --optimize` and `uv run python cli.py assess --smiles "CCN(CC)CC"` |
 | Metrics to inspect | Unit/integration tests cover model, pipeline, discovery extension, and structure integration contracts; promote benchmark tables here when a calibrated public run is available |
 | Limitations | Research triage only; pIC50, ADMET, docking, and synthesis outputs require calibration and expert review before real-world decisions |
+
+## Third Deep-Learning Path: ELT
+
+The CPU Ridge result on methylphenidate is directionally useful but weak by about
+1.33 log units versus literature. A natural next model to try is ELT, based on
+`zapabob/elastic-looped-transformer`: a Transformer block is shared across a
+selectable number of loop iterations, so the same checkpoint can trade latency
+for iterative refinement. In this repo, the idea is adapted from causal language
+modeling to pIC50 regression over molecular descriptor tokens.
+
+Current implementation:
+
+- `src/models/elastic_looped_transformer.py` adds `ElasticLoopedPIC50Model` and
+  `LitElasticLoopedPIC50`.
+- `train-elt` exposes the model from the CLI.
+- The same checkpoint can be evaluated with shorter or longer loop schedules,
+  making it a practical candidate for uncertainty and budget-sensitive pharma
+  triage.
+
+```bash
+uv run python -B cli.py train-elt --target CHEMBL238 --loop-count 4 --epochs 20
+```
+
+CHEMBL238 CPU smoke run on the frozen snapshot:
+
+```bash
+uv run python -B scripts/run_elt_chembl238_smoke.py
+```
+
+The checked smoke report is
+`artifacts/elt_chembl238_smoke_report.json`. In the 5-epoch CPU run, the ELT
+path is not yet globally stronger than Ridge (`external R2 = -0.0213`, `RMSE =
+1.1566`), but the methylphenidate loop trajectory is useful: pIC50 moves from
+4.7812 at `L=1` to 6.3530 at `L=4`. That is still 1.0189 log units weaker than
+the literature mean, but it is about 0.3130 pIC50 closer than the Ridge baseline
+and roughly halves the methylphenidate fold error from about 21x to about 10x.
+
+Reference implementation: https://github.com/zapabob/elastic-looped-transformer
 
 ## Pharma MVP Evidence Snapshot
 

@@ -153,3 +153,54 @@ Primary references:
 4. Add model cards for each promoted model version.
 5. Add drift monitoring for descriptor and prediction distributions.
 6. Add authenticated API access, audit logs, and model registry promotion gates.
+
+## ELT Deep-Learning Candidate
+
+The methylphenidate sanity check shows a useful but limited CPU baseline:
+directionally active, yet about 1.33 pIC50 log units weaker than literature. The
+next deep-learning candidate is an elastic-looped Transformer adapted from
+`zapabob/elastic-looped-transformer`.
+
+Why it fits here:
+
+- It is the third deep-learning path after the descriptor Transformer and GNN.
+- It shares one Transformer block across selectable loop iterations, so the same
+  checkpoint can be run at different compute budgets.
+- For pIC50 triage, loop count can become an evaluation axis alongside
+  uncertainty, applicability domain, scaffold split, and external validation.
+- The pIC50 implementation keeps the dependency surface small by adapting the
+  looped-Transformer pattern directly instead of importing the causal-LM repo.
+
+Command:
+
+```bash
+uv run python -B cli.py train-elt --target CHEMBL238 --loop-count 4 --epochs 20
+```
+
+Snapshot smoke run:
+
+```bash
+uv run python -B scripts/run_elt_chembl238_smoke.py
+```
+
+Current CHEMBL238 smoke result from `artifacts/elt_chembl238_smoke_report.json`:
+
+| Loop count | Methylphenidate pIC50 | Uncertainty | Delta vs literature mean | Fold weaker than literature |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 4.7812 | 0.6351 | -2.5907 | 389.6727 |
+| 2 | 6.0679 | 0.6477 | -1.3040 | 20.1372 |
+| 3 | 6.3114 | 0.6528 | -1.0605 | 11.4948 |
+| 4 | 6.3530 | 0.6522 | -1.0189 | 10.4448 |
+
+This is a smoke run, not model selection evidence. The split metrics remain
+weak (`external R2 = -0.0213`, `RMSE = 1.1566`), but the loop trajectory shows
+the ELT mechanism is doing something useful for methylphenidate: deeper loops
+move the prediction closer to the literature mean and improve on the Ridge
+baseline by about 0.313 pIC50 at loop 4.
+
+References checked on 2026-05-27:
+
+- GitHub: https://github.com/zapabob/elastic-looped-transformer
+- arXiv: https://arxiv.org/abs/2604.09168
+- Hugging Face CLI note: `hf` was not installed in this local environment, so
+  Hub-side publishing was left as a follow-up rather than claimed as complete.

@@ -169,6 +169,7 @@ processed_data/
 !models/demo_cpu_pic50_model.json
 !artifacts/
 !artifacts/demo_cpu_benchmark.json
+!artifacts/elt_chembl238_smoke_report.json
 
 # Log Files
 *.log
@@ -228,6 +229,7 @@ checkpoint/
 artifacts/
 !artifacts/
 !artifacts/demo_cpu_benchmark.json
+!artifacts/elt_chembl238_smoke_report.json
 models/trained/
 models/checkpoints/
 models/artifacts/
