@@ -3,11 +3,30 @@
 from __future__ import annotations
 
 import json
-import subprocess
+# Docking backends are invoked with shell=False and validated argv.
+import subprocess  # nosec B404
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+
+
+def _run_docking_command(command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+    """Execute a docking command after normalizing argv-style arguments."""
+    if not command:
+        raise ValueError("Docking command cannot be empty.")
+
+    normalized = [str(part) for part in command]
+    if any(part == "" for part in normalized):
+        raise ValueError("Docking command arguments cannot be empty.")
+
+    # Configured docking command is normalized to argv; subprocess shell remains disabled.
+    return subprocess.run(  # nosec B603
+        normalized,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
 
 
 @dataclass
@@ -119,12 +138,7 @@ class CommandLineDockingRunner:
         if self.dry_run:
             return {"status": "dry_run", "command": command, "job": job.to_dict()}
 
-        completed = subprocess.run(
-            command,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+        completed = _run_docking_command(command)
         return {
             "status": "completed" if completed.returncode == 0 else "failed",
             "returncode": completed.returncode,

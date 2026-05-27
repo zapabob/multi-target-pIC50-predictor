@@ -1,6 +1,13 @@
 """Tests for structure and docking integration contracts."""
 
-from src.integrations import AlphaFold3JobSpec, DockingJobSpec, ProteinTarget
+import sys
+
+from src.integrations import (
+    AlphaFold3JobSpec,
+    CommandLineDockingRunner,
+    DockingJobSpec,
+    ProteinTarget,
+)
 
 
 def test_alphafold3_job_spec_exports_expected_json_shape():
@@ -30,3 +37,23 @@ def test_docking_job_spec_is_serializable():
     )
 
     assert job.to_dict()["engine"] == "vina"
+
+
+def test_command_line_docking_runner_executes_valid_argv(tmp_path):
+    job = DockingJobSpec(
+        name="dock_test",
+        receptor_path="receptor.pdbqt",
+        ligand_path="ligand.pdbqt",
+        center=(1.0, 2.0, 3.0),
+        box_size=(20.0, 20.0, 20.0),
+    )
+    runner = CommandLineDockingRunner(
+        [sys.executable, "-c", "print('dock ok')"],
+        dry_run=False,
+    )
+
+    result = runner.run(job, tmp_path)
+
+    assert result["status"] == "completed"
+    assert result["returncode"] == 0
+    assert result["stdout"].strip() == "dock ok"

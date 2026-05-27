@@ -182,11 +182,18 @@ def _apply_reaction(input_smiles: str, reaction_smarts: str) -> list[tuple[str, 
     for products in product_sets:
         smiles_products: list[str] = []
         for product in products:
-            try:
-                Chem.SanitizeMol(product)
-                smiles_products.append(Chem.MolToSmiles(product, canonical=True))
-            except Exception:
-                continue
+            canonical_smiles = _canonical_product_smiles(product, Chem)
+            if canonical_smiles is not None:
+                smiles_products.append(canonical_smiles)
         if smiles_products:
             canonical.add(tuple(sorted(smiles_products)))
     return sorted(canonical)
+
+
+def _canonical_product_smiles(product: Any, chem_module: Any) -> str | None:
+    """Return canonical SMILES for valid RDKit products."""
+    try:
+        chem_module.SanitizeMol(product)
+        return chem_module.MolToSmiles(product, canonical=True)
+    except Exception:
+        return None

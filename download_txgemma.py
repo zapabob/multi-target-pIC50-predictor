@@ -4,7 +4,9 @@ TxGemma-9B-Chat-GGUF ダウンロードスクリプト
 Hugging Faceから直接ダウンロードしてOllamaで使用可能にする
 """
 
-import subprocess
+import shutil
+# The local Ollama CLI is invoked with shell=False and validated argv.
+import subprocess  # nosec B404
 import sys
 from pathlib import Path
 
@@ -13,6 +15,32 @@ from tqdm import tqdm
 
 
 DOWNLOAD_TIMEOUT = (10, 120)
+OLLAMA_BINARY = "ollama"
+
+
+def _run_ollama(
+    args: list[str], *, timeout: int | None = None, check: bool = False
+) -> subprocess.CompletedProcess[str]:
+    """Run Ollama with validated argv-style arguments."""
+    executable = shutil.which(OLLAMA_BINARY)
+    if executable is None:
+        raise FileNotFoundError("Ollama not found")
+
+    if not args:
+        raise ValueError("Ollama command requires at least one argument")
+
+    command = [executable, *[str(arg) for arg in args]]
+    if any(arg == "" for arg in command):
+        raise ValueError("Ollama command arguments cannot be empty")
+
+    # Fixed executable plus validated argv list; subprocess shell remains disabled.
+    return subprocess.run(  # nosec B603
+        command,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        check=check,
+    )
 
 
 class TxGemmaDownloader:
@@ -125,15 +153,14 @@ class TxGemmaDownloader:
         try:
             # Ollama create コマンド
             cmd = [
-                "ollama",
                 "create",
                 f"txgemma:9b-chat-{self.quantization.lower()}",
                 "-f",
                 str(self.filepath),
             ]
 
-            print(f"Running: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            print(f"Running: {OLLAMA_BINARY} {' '.join(cmd)}")
+            result = _run_ollama(cmd, check=True)
 
             print("Successfully imported to Ollama!")
             print(f"Output: {result.stdout}")
@@ -154,14 +181,13 @@ class TxGemmaDownloader:
         try:
             # 簡単なテストクエリ
             cmd = [
-                "ollama",
                 "run",
                 f"txgemma:9b-chat-{self.quantization.lower()}",
                 "Hello, can you help with drug discovery?",
             ]
 
-            print(f"Running: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            print(f"Running: {OLLAMA_BINARY} {' '.join(cmd)}")
+            result = _run_ollama(cmd, timeout=60)
 
             if result.returncode == 0:
                 print("Model test successful!")
