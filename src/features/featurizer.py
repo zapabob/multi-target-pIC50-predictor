@@ -104,15 +104,15 @@ class MolecularFeaturizer:
         return descriptor_names + fingerprint_names + smarts_names
 
     def _get_smiles_hash(self, smiles: str) -> str:
-        """Get MD5 hash of SMILES string.
+        """Get SHA-256 hash of SMILES string.
 
         Args:
             smiles: SMILES string
 
         Returns:
-            MD5 hash string
+            SHA-256 hash string
         """
-        return hashlib.md5(smiles.encode()).hexdigest()
+        return hashlib.sha256(smiles.encode("utf-8")).hexdigest()
 
     def calculate_features(self, smiles: str) -> np.ndarray | None:
         """Calculate molecular features for a SMILES string.

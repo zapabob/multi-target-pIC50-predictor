@@ -2,7 +2,7 @@
 Caching utilities for molecular features and data.
 """
 
-import pickle
+import json
 from pathlib import Path
 from typing import Any
 
@@ -137,7 +137,7 @@ class DataCache:
         """
         target_dir = self.data_dir / target_id
         target_dir.mkdir(parents=True, exist_ok=True)
-        return target_dir / "raw_data.pkl"
+        return target_dir / "raw_data.json"
 
     def save_raw(self, target_id: str, raw_data: Any) -> None:
         """Save raw data dump.
@@ -147,8 +147,17 @@ class DataCache:
             raw_data: Raw data to save
         """
         raw_path = self.get_raw_path(target_id)
-        with open(raw_path, "wb") as f:
-            pickle.dump(raw_data, f)
+        if isinstance(raw_data, pd.DataFrame):
+            payload = {
+                "type": "dataframe_records",
+                "data": raw_data.to_dict(orient="records"),
+                "columns": list(raw_data.columns),
+            }
+        else:
+            payload = {"type": "json", "data": raw_data}
+
+        with open(raw_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False)
 
     def get_raw(self, target_id: str) -> Any | None:
         """Get raw data dump.
@@ -162,8 +171,11 @@ class DataCache:
         raw_path = self.get_raw_path(target_id)
         if raw_path.exists():
             try:
-                with open(raw_path, "rb") as f:
-                    return pickle.load(f)
+                with open(raw_path, encoding="utf-8") as f:
+                    payload = json.load(f)
+                if payload.get("type") == "dataframe_records":
+                    return pd.DataFrame(payload["data"], columns=payload.get("columns"))
+                return payload.get("data")
             except Exception:
                 return None
         return None

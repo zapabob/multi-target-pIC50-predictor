@@ -32,7 +32,7 @@ uv sync --extra prod
 Airflow is separate because it should be installed with official constraints:
 
 ```bash
-uv pip install "apache-airflow==2.10.5" --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.10.5/constraints-3.12.txt"
+uv pip install "apache-airflow==3.2.1" --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-3.2.1/constraints-3.12.txt"
 ```
 
 If a PyG operation needs compiled extensions such as `torch-scatter` or

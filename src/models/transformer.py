@@ -16,6 +16,11 @@ from sklearn.metrics import mean_squared_error, r2_score
 from torch.utils.data import DataLoader, TensorDataset
 
 
+def _safe_torch_load(path, map_location="cpu"):
+    """Load tensor-only checkpoints with PyTorch's restricted unpickler."""
+    return torch.load(path, map_location=map_location, weights_only=True)  # nosec B614
+
+
 class TransformerModel(nn.Module):
     """Transformer-based model for pIC50 prediction."""
 
@@ -159,7 +164,7 @@ class LitPIC50(pl.LightningModule):
     @classmethod
     def load_from_checkpoint(cls, checkpoint_path, *args, **kwargs):
         """Load either a Lightning checkpoint or a plain state_dict checkpoint."""
-        checkpoint = torch.load(checkpoint_path, map_location=kwargs.get("map_location", "cpu"))
+        checkpoint = _safe_torch_load(checkpoint_path, map_location=kwargs.get("map_location", "cpu"))
         if isinstance(checkpoint, dict) and "pytorch-lightning_version" not in checkpoint:
             input_projection = checkpoint.get("model.input_projection.weight")
             if input_projection is None:

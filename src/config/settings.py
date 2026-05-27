@@ -19,7 +19,7 @@ class AppSettings(PydanticBaseSettings):
     version: str = "1.0.0"
     environment: str = Field(default="development", env="ENV")
     debug: bool = Field(default=False, env="DEBUG")
-    host: str = Field(default="0.0.0.0", env="HOST")
+    host: str = Field(default="127.0.0.1", env="HOST")
     port: int = Field(default=8000, env="PORT")
     workers: int = Field(default=1, env="WORKERS")
     max_requests: int = Field(default=1000, env="MAX_REQUESTS")

@@ -3,6 +3,7 @@ Ensemble learning manager for molecular pIC50 prediction.
 Combines Transformer, GNN, XGBoost, and Random Forest models.
 """
 
+import json
 import logging
 
 import numpy as np
@@ -11,6 +12,19 @@ import xgboost as xgb
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
+
+
+def _json_safe(value):
+    """Convert numpy values to JSON-compatible Python values."""
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe(item) for item in value]
+    return value
 
 
 class EnsembleManager:
@@ -407,18 +421,16 @@ class EnsembleManager:
         Args:
             filepath: Path to save ensemble
         """
-        import pickle
-
         ensemble_data = {
             "method": self.method,
             "use_uncertainty": self.use_uncertainty,
-            "model_weights": self.model_weights,
+            "model_weights": _json_safe(self.model_weights),
             "is_fitted": self.is_fitted,
             "model_names": list(self.models.keys()),
         }
 
-        with open(filepath, "wb") as f:
-            pickle.dump(ensemble_data, f)
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(ensemble_data, f, ensure_ascii=False, indent=2)
 
         self.logger.info(f"Ensemble configuration saved to {filepath}")
 
@@ -428,10 +440,8 @@ class EnsembleManager:
         Args:
             filepath: Path to load ensemble from
         """
-        import pickle
-
-        with open(filepath, "rb") as f:
-            ensemble_data = pickle.load(f)
+        with open(filepath, encoding="utf-8") as f:
+            ensemble_data = json.load(f)
 
         self.method = ensemble_data["method"]
         self.use_uncertainty = ensemble_data["use_uncertainty"]

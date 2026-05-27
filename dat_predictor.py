@@ -2,7 +2,6 @@ import hashlib
 import io
 import logging
 import os
-import pickle
 import sys
 from dataclasses import dataclass
 from datetime import datetime
@@ -63,6 +62,81 @@ from sklearn.utils import resample
 from tqdm import tqdm
 
 
+def _safe_torch_load(path: str | Path, map_location=None):
+    """Load tensor-only checkpoint data with PyTorch's restricted unpickler."""
+    return torch.load(path, map_location=map_location, weights_only=True)  # nosec B614
+
+
+def _to_plain(value):
+    """Convert numpy/scikit-learn state into checkpoint-safe values."""
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, tuple):
+        return [_to_plain(item) for item in value]
+    if isinstance(value, list):
+        return [_to_plain(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _to_plain(item) for key, item in value.items()}
+    return value
+
+
+_SCALER_TYPES = {
+    "RobustScaler": RobustScaler,
+    "StandardScaler": StandardScaler,
+}
+_SCALER_STATE_ATTRS = (
+    "center_",
+    "scale_",
+    "mean_",
+    "var_",
+    "n_samples_seen_",
+    "n_features_in_",
+    "feature_names_in_",
+)
+
+
+def _serialize_scaler(scaler):
+    """Serialize fitted sklearn scalers without pickling executable objects."""
+    scaler_type = scaler.__class__.__name__
+    if scaler_type not in _SCALER_TYPES:
+        raise TypeError(f"Unsupported scaler type: {scaler_type}")
+    attrs = {
+        name: _to_plain(getattr(scaler, name))
+        for name in _SCALER_STATE_ATTRS
+        if hasattr(scaler, name)
+    }
+    return {
+        "class": scaler_type,
+        "params": _to_plain(scaler.get_params(deep=False)),
+        "attrs": attrs,
+    }
+
+
+def _restore_scaler(payload):
+    """Restore a sklearn scaler from a safe serialized state."""
+    if isinstance(payload, (RobustScaler, StandardScaler)):
+        return payload
+
+    scaler_type = payload["class"]
+    scaler_cls = _SCALER_TYPES.get(scaler_type)
+    if scaler_cls is None:
+        raise TypeError(f"Unsupported scaler type: {scaler_type}")
+
+    params = dict(payload.get("params", {}))
+    if scaler_type == "RobustScaler" and isinstance(params.get("quantile_range"), list):
+        params["quantile_range"] = tuple(params["quantile_range"])
+
+    scaler = scaler_cls(**params)
+    for name, value in payload.get("attrs", {}).items():
+        if isinstance(value, list):
+            setattr(scaler, name, np.asarray(value))
+        else:
+            setattr(scaler, name, value)
+    return scaler
+
+
 @dataclass
 class ModelConfig:
     TEST_SIZE: float = 0.2
@@ -86,12 +160,12 @@ class FeatureCache:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def _get_cache_path(self, smiles: str) -> Path:
-        return self.cache_dir / f"{hashlib.md5(smiles.encode()).hexdigest()}.npz"
+        return self.cache_dir / f"{hashlib.sha256(smiles.encode('utf-8')).hexdigest()}.npz"
 
     def get(self, smiles: str) -> np.ndarray | None:
         cache_path = self._get_cache_path(smiles)
         if cache_path.exists():
-            return np.load(cache_path)["features"]
+            return np.load(cache_path, allow_pickle=False)["features"]
         return None
 
     def save(self, smiles: str, features: np.ndarray) -> None:
@@ -378,7 +452,7 @@ class ModelPipeline:
 
         # 早期停止後、ベストモデルをロード
         if early_stopping and os.path.exists("best_model.pt"):
-            self.model.load_state_dict(torch.load("best_model.pt"))
+            self.model.load_state_dict(_safe_torch_load("best_model.pt"))
             os.remove("best_model.pt")
 
         # 学習曲線をプロット
@@ -485,7 +559,7 @@ class ModelPipeline:
 
             # ベストモデルのロード
             if os.path.exists("fold_best_model.pt"):
-                model.load_state_dict(torch.load("fold_best_model.pt"))
+                model.load_state_dict(_safe_torch_load("fold_best_model.pt"))
                 os.remove("fold_best_model.pt")
 
             # 検証セットでの評価
@@ -551,11 +625,11 @@ class DATPredictor:
 
     def fetch_data(self, target_chembl_id: str = "CHEMBL238") -> pd.DataFrame:
         """ChEMBLからのデータ取得（ターゲットID指定可）"""
-        cache_path = Path(self.config.CACHE_DIR) / f"chembl_data_{target_chembl_id}.pkl"
+        cache_key = hashlib.sha256(target_chembl_id.encode("utf-8")).hexdigest()
+        cache_path = Path(self.config.CACHE_DIR) / f"chembl_data_{cache_key}.json"
         try:
             if cache_path.exists():
-                with open(cache_path, "rb") as f:
-                    df = pickle.load(f)
+                df = pd.read_json(cache_path, orient="records")
                 logging.info("キャッシュからデータを読み込みました")
                 return df
             target = new_client.target
@@ -572,8 +646,7 @@ class DATPredictor:
             result_df = df[["molecule_chembl_id", "canonical_smiles", "standard_value"]].dropna()
             result_df = result_df[result_df["standard_value"] < 1_000_000]
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(cache_path, "wb") as f:
-                pickle.dump(result_df, f)
+            result_df.to_json(cache_path, orient="records", force_ascii=False)
             logging.info(f"ChEMBL({target_chembl_id})から{len(result_df)}件のデータを取得しました")
             return result_df
         except Exception as e:
@@ -921,8 +994,8 @@ class DATPredictor:
                 {
                     "version": 1.0,  # バージョン情報の追加
                     "model_state_dict": self.pipeline.model.state_dict(),
-                    "scaler": self.pipeline.scaler,
-                    "y_scaler": self.pipeline.y_scaler,  # y_scaler を含める
+                    "scaler": _serialize_scaler(self.pipeline.scaler),
+                    "y_scaler": _serialize_scaler(self.pipeline.y_scaler),  # y_scaler を含める
                     "is_trained": self.is_trained,
                     "input_dim": self.pipeline.model.embedding.in_features,
                     "num_layers": self.pipeline.model.transformer_encoder.num_layers,
@@ -938,7 +1011,7 @@ class DATPredictor:
                     "removed_features": self.removed_features,
                     "feature_names": self.feature_names,
                     "full_feature_names": self.full_feature_names,
-                    "feature_indices": self.feature_indices,  # 追加
+                    "feature_indices": _to_plain(self.feature_indices),  # 追加
                 },
                 temp_path,
             )
@@ -953,7 +1026,7 @@ class DATPredictor:
     def load_model(self, path: str) -> None:
         """モデルの読み込み"""
         try:
-            checkpoint = torch.load(path, map_location=self.pipeline.device)
+            checkpoint = _safe_torch_load(path, map_location=self.pipeline.device)
 
             # 必要なキーがすべて存在するか確認
             required_keys = [
@@ -971,8 +1044,8 @@ class DATPredictor:
             if missing_keys:
                 raise KeyError(f"チェックポイントに必要なキーが不足しています: {missing_keys}")
 
-            self.pipeline.scaler = checkpoint["scaler"]
-            self.pipeline.y_scaler = checkpoint["y_scaler"]
+            self.pipeline.scaler = _restore_scaler(checkpoint["scaler"])
+            self.pipeline.y_scaler = _restore_scaler(checkpoint["y_scaler"])
             self.is_trained = checkpoint["is_trained"]
             self.model_type = checkpoint["model_type"]
             self.removed_features = checkpoint.get("removed_features", [])

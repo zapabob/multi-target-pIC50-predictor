@@ -60,15 +60,15 @@ class MolecularGraphFeaturizer:
         )
 
     def _get_smiles_hash(self, smiles: str) -> str:
-        """Get MD5 hash of SMILES string for caching.
+        """Get SHA-256 hash of SMILES string for caching.
 
         Args:
             smiles: SMILES string
 
         Returns:
-            MD5 hash string
+            SHA-256 hash string
         """
-        return hashlib.md5(f"graph_{smiles}".encode()).hexdigest()
+        return hashlib.sha256(f"graph_{smiles}".encode("utf-8")).hexdigest()
 
     def _get_atom_features(self, atom: Chem.Atom) -> torch.Tensor:
         """Extract atom features for GNN.

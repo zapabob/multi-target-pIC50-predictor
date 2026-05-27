@@ -97,7 +97,7 @@ Airflow is intentionally managed separately because it should be installed with
 the official Airflow constraints file:
 
 ```bash
-uv pip install "apache-airflow==2.10.5" --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.10.5/constraints-3.12.txt"
+uv pip install "apache-airflow==3.2.1" --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-3.2.1/constraints-3.12.txt"
 ```
 
 See [docs/uv_environment.md](docs/uv_environment.md) for more details.

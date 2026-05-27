@@ -12,6 +12,9 @@ import requests
 from tqdm import tqdm
 
 
+DOWNLOAD_TIMEOUT = (10, 120)
+
+
 class TxGemmaDownloader:
     """TxGemma-9B-Chat-GGUF ダウンローダー"""
 
@@ -63,7 +66,9 @@ class TxGemmaDownloader:
             headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
             # リクエスト開始
-            response = requests.get(self.url, headers=headers, stream=True)
+            response = requests.get(
+                self.url, headers=headers, stream=True, timeout=DOWNLOAD_TIMEOUT
+            )
             response.raise_for_status()
 
             # ファイルサイズ取得
