@@ -158,6 +158,174 @@ class ElasticLoopedPIC50Model(nn.Module):
         )
 
 
+class MultimodalElasticLoopedPIC50Model(nn.Module):
+    """ViT-style multimodal pIC50 regressor with an elastic looped Transformer.
+
+    Molecular descriptors become learned descriptor tokens. Rendered molecule
+    images become non-overlapping grayscale patch tokens in the same spirit as a
+    small ViT. Optional graph summary vectors can be appended as one additional
+    modality token.
+    """
+
+    def __init__(
+        self,
+        descriptor_dim: int,
+        image_feature_dim: int = 1024,
+        image_grid_size: int = 32,
+        image_patch_size: int = 4,
+        graph_feature_dim: int | None = None,
+        hidden_dim: int = 128,
+        descriptor_token_count: int = 4,
+        num_heads: int = 4,
+        dropout: float = 0.1,
+        default_num_loops: int = 4,
+    ):
+        super().__init__()
+        if descriptor_dim < 1:
+            raise ValueError("descriptor_dim must be positive")
+        if image_grid_size < 1:
+            raise ValueError("image_grid_size must be positive")
+        if image_patch_size < 1 or image_grid_size % image_patch_size != 0:
+            raise ValueError("image_patch_size must divide image_grid_size")
+        if image_feature_dim != image_grid_size * image_grid_size:
+            raise ValueError("image_feature_dim must equal image_grid_size squared")
+        if descriptor_token_count < 1:
+            raise ValueError("descriptor_token_count must be positive")
+        if hidden_dim % num_heads != 0:
+            raise ValueError("hidden_dim must be divisible by num_heads")
+
+        self.descriptor_dim = descriptor_dim
+        self.image_feature_dim = image_feature_dim
+        self.image_grid_size = image_grid_size
+        self.image_patch_size = image_patch_size
+        self.graph_feature_dim = graph_feature_dim
+        self.hidden_dim = hidden_dim
+        self.descriptor_token_count = descriptor_token_count
+        self.default_num_loops = default_num_loops
+        self.image_patch_count = (image_grid_size // image_patch_size) ** 2
+
+        self.descriptor_projection = nn.Linear(
+            descriptor_dim,
+            hidden_dim * descriptor_token_count,
+        )
+        self.image_patch_projection = nn.Linear(image_patch_size * image_patch_size, hidden_dim)
+        self.graph_projection = (
+            nn.Linear(graph_feature_dim, hidden_dim) if graph_feature_dim is not None else None
+        )
+
+        max_tokens = descriptor_token_count + self.image_patch_count
+        if graph_feature_dim is not None:
+            max_tokens += 1
+        self.position_embedding = nn.Parameter(torch.randn(1, max_tokens, hidden_dim) * 0.02)
+        self.descriptor_modality = nn.Parameter(torch.randn(1, 1, hidden_dim) * 0.02)
+        self.image_modality = nn.Parameter(torch.randn(1, 1, hidden_dim) * 0.02)
+        self.graph_modality = nn.Parameter(torch.randn(1, 1, hidden_dim) * 0.02)
+        self.step_embedding = LoopStepEmbedding(hidden_dim)
+        self.shared_block = nn.TransformerEncoderLayer(
+            d_model=hidden_dim,
+            nhead=num_heads,
+            dim_feedforward=hidden_dim * 4,
+            dropout=dropout,
+            batch_first=True,
+            activation="gelu",
+        )
+        self.norm = nn.LayerNorm(hidden_dim)
+        self.regression_head = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim // 2, 1),
+        )
+        self.uncertainty_head = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim // 2, 1),
+            nn.Softplus(),
+        )
+
+    def _descriptor_tokens(self, descriptor_features: torch.Tensor) -> torch.Tensor:
+        if descriptor_features.dim() != 2:
+            raise ValueError("descriptor_features must have shape [batch, descriptor_dim]")
+        if descriptor_features.size(1) != self.descriptor_dim:
+            raise ValueError(f"descriptor_features width must be {self.descriptor_dim}")
+
+        batch_size = descriptor_features.size(0)
+        tokens = self.descriptor_projection(descriptor_features)
+        tokens = tokens.view(batch_size, self.descriptor_token_count, self.hidden_dim)
+        return tokens + self.descriptor_modality
+
+    def _image_patch_tokens(self, image_features: torch.Tensor) -> torch.Tensor:
+        if image_features.dim() != 2:
+            raise ValueError("image_features must have shape [batch, image_feature_dim]")
+        if image_features.size(1) != self.image_feature_dim:
+            raise ValueError(f"image_features width must be {self.image_feature_dim}")
+
+        batch_size = image_features.size(0)
+        grid = image_features.view(batch_size, 1, self.image_grid_size, self.image_grid_size)
+        patches = grid.unfold(2, self.image_patch_size, self.image_patch_size).unfold(
+            3,
+            self.image_patch_size,
+            self.image_patch_size,
+        )
+        patches = patches.permute(0, 2, 3, 1, 4, 5).contiguous()
+        patches = patches.view(batch_size, self.image_patch_count, self.image_patch_size**2)
+        return self.image_patch_projection(patches) + self.image_modality
+
+    def _graph_token(self, graph_features: torch.Tensor) -> torch.Tensor:
+        if self.graph_projection is None:
+            raise ValueError("graph_feature_dim must be configured before passing graph_features")
+        if graph_features.dim() != 2:
+            raise ValueError("graph_features must have shape [batch, graph_feature_dim]")
+        if graph_features.size(1) != self.graph_feature_dim:
+            raise ValueError(f"graph_features width must be {self.graph_feature_dim}")
+        return self.graph_projection(graph_features).unsqueeze(1) + self.graph_modality
+
+    def forward(
+        self,
+        descriptor_features: torch.Tensor,
+        image_features: torch.Tensor | None = None,
+        graph_features: torch.Tensor | None = None,
+        loop_steps: tuple[float, ...] | None = None,
+    ) -> ElasticLoopedPIC50Output:
+        """Predict pIC50 from descriptor, image-patch, and optional graph modalities."""
+
+        normalized_steps = _validate_loop_steps(
+            loop_steps or default_loop_steps(self.default_num_loops)
+        )
+        token_parts = [self._descriptor_tokens(descriptor_features)]
+        evidence_channels = ["molecular_descriptor"]
+
+        if image_features is not None:
+            token_parts.append(self._image_patch_tokens(image_features))
+            evidence_channels.append("molecule_render_vit_patch")
+        if graph_features is not None:
+            token_parts.append(self._graph_token(graph_features))
+            evidence_channels.append("graph_summary")
+
+        x = torch.cat(token_parts, dim=1)
+        x = x + self.position_embedding[:, : x.size(1), :]
+
+        elapsed = 0.0
+        batch_size = descriptor_features.size(0)
+        for step in normalized_steps:
+            x = x + self.step_embedding(elapsed, step, batch_size, descriptor_features.device)
+            x = self.shared_block(x)
+            elapsed += step
+
+        pooled = self.norm(x).mean(dim=1)
+        pic50 = self.regression_head(pooled)
+        uncertainty = self.uncertainty_head(pooled) + 1e-6
+        evidence_channels.append("elastic_looped_transformer")
+        return ElasticLoopedPIC50Output(
+            pic50=pic50,
+            uncertainty=uncertainty,
+            loop_count=len(normalized_steps),
+            normalized_loop_steps=normalized_steps,
+            evidence_channels=tuple(evidence_channels),
+        )
+
+
 class LitElasticLoopedPIC50(pl.LightningModule):
     """PyTorch Lightning wrapper for the elastic-looped pIC50 model."""
 

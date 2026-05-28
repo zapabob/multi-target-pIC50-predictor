@@ -1,0 +1,107 @@
+{
+  "snapshot_id": "chembl-pic50-20260527T153246Z",
+  "created_at_utc": "2026-05-27T15:33:17.530558+00:00",
+  "source": "ChEMBL webresource client",
+  "row_count": 1800,
+  "csv_path": "data/chembl_category_pic50_snapshot.csv",
+  "csv_sha256": "8eaa42fea6fb039ca14649e2d5ccc778b7ec650fa15a8a2700bc92466cfdf27b",
+  "schema": [
+    "snapshot_id",
+    "target",
+    "target_name",
+    "molecule_chembl_id",
+    "canonical_smiles",
+    "pIC50",
+    "split",
+    "scaffold_smiles",
+    "source"
+  ],
+  "targets": {
+    "CHEMBL224": {
+      "target_name": "5HT2A",
+      "row_count": 300,
+      "split_counts": {
+        "external": 28,
+        "scaffold_test": 23,
+        "train": 249
+      },
+      "source": "ChEMBL"
+    },
+    "CHEMBL218": {
+      "target_name": "CB1",
+      "row_count": 300,
+      "split_counts": {
+        "external": 65,
+        "scaffold_test": 30,
+        "train": 205
+      },
+      "source": "ChEMBL"
+    },
+    "CHEMBL253": {
+      "target_name": "CB2",
+      "row_count": 300,
+      "split_counts": {
+        "external": 47,
+        "scaffold_test": 38,
+        "train": 215
+      },
+      "source": "ChEMBL"
+    },
+    "CHEMBL233": {
+      "target_name": "\u03bc-opioid",
+      "row_count": 300,
+      "split_counts": {
+        "external": 33,
+        "scaffold_test": 50,
+        "train": 217
+      },
+      "source": "ChEMBL"
+    },
+    "CHEMBL236": {
+      "target_name": "\u03b4-opioid",
+      "row_count": 300,
+      "split_counts": {
+        "external": 48,
+        "scaffold_test": 53,
+        "train": 199
+      },
+      "source": "ChEMBL"
+    },
+    "CHEMBL238": {
+      "target_name": "DAT",
+      "row_count": 300,
+      "split_counts": {
+        "external": 41,
+        "scaffold_test": 64,
+        "train": 195
+      },
+      "source": "ChEMBL"
+    }
+  },
+  "filters": {
+    "standard_type": "IC50",
+    "standard_units": "nM",
+    "pIC50_range": [
+      0,
+      15
+    ],
+    "max_rows_per_target": 300
+  },
+  "split_policy": {
+    "method": "stable_scaffold_hash",
+    "random_seed": 42,
+    "scaffold_test_fraction": 0.15,
+    "external_fraction": 0.15,
+    "unit": "Murcko scaffold"
+  },
+  "context_of_use": {
+    "intended_use": "fixed benchmark for model evaluation and pharma due diligence",
+    "decision_role": "research_triage_only",
+    "not_for": [
+      "clinical_decision",
+      "regulatory_submission",
+      "manufacturing_release",
+      "patient_care"
+    ]
+  }
+}

@@ -262,6 +262,37 @@ def train_elt(args):
     print(f"Elastic-looped Transformer model saved to {output_path}")
 
 
+def deep_cv(args):
+    """Cross-validate compact GNN and multimodal ELT models on CHEMBL238."""
+    from scripts.run_deep_cv_chembl238 import run_deep_cv_chembl238
+
+    model_names = tuple(model.strip() for model in args.models.split(",") if model.strip())
+    report = run_deep_cv_chembl238(
+        snapshot_path=Path(args.snapshot),
+        report_path=Path(args.output),
+        target=args.target,
+        models=model_names,
+        folds=args.folds,
+        epochs=args.epochs,
+        hidden_dim=args.hidden_dim,
+        descriptor_token_count=args.descriptor_token_count,
+        image_grid_size=args.image_grid_size,
+        image_patch_size=args.image_patch_size,
+        loop_count=args.loop_count,
+        batch_size=args.batch_size,
+        learning_rate=args.learning_rate,
+        random_seed=args.random_seed,
+        max_rows=args.max_rows,
+    )
+    print(f"Deep CV report saved to {args.output}")
+    for model_name, model_report in report["models"].items():
+        metrics = model_report["mean_metrics"]
+        print(
+            f"{model_name}: R2={metrics['r2']} RMSE={metrics['rmse']} "
+            f"MAE={metrics['mae']} n={metrics['n']}"
+        )
+
+
 def train_ensemble(args):
     """アンサンブルモデルの学習"""
     try:
@@ -612,6 +643,27 @@ elt_parser.add_argument("--epochs", type=int, default=50, help="number of epochs
 elt_parser.add_argument("--batch-size", type=int, default=32, help="batch size")
 elt_parser.set_defaults(func=train_elt)
 
+deep_cv_parser = subparsers.add_parser(
+    "deep-cv",
+    help="cross-validate GNN and multimodal ELT on CHEMBL238",
+)
+deep_cv_parser.add_argument("--snapshot", default="data/chembl238_pic50_snapshot.csv")
+deep_cv_parser.add_argument("--output", default="artifacts/deep_cv_chembl238_report.json")
+deep_cv_parser.add_argument("--target", default="CHEMBL238")
+deep_cv_parser.add_argument("--models", default="multimodal_elt,gnn")
+deep_cv_parser.add_argument("--folds", type=int, default=3)
+deep_cv_parser.add_argument("--epochs", type=int, default=2)
+deep_cv_parser.add_argument("--hidden-dim", type=int, default=32)
+deep_cv_parser.add_argument("--descriptor-token-count", type=int, default=4)
+deep_cv_parser.add_argument("--image-grid-size", type=int, default=16)
+deep_cv_parser.add_argument("--image-patch-size", type=int, default=4)
+deep_cv_parser.add_argument("--loop-count", type=int, default=4)
+deep_cv_parser.add_argument("--batch-size", type=int, default=32)
+deep_cv_parser.add_argument("--learning-rate", type=float, default=5e-4)
+deep_cv_parser.add_argument("--random-seed", type=int, default=42)
+deep_cv_parser.add_argument("--max-rows", type=int, default=240)
+deep_cv_parser.set_defaults(func=deep_cv)
+
 # 新機能：アンサンブル学習
 ensemble_parser = subparsers.add_parser("train-ensemble", help="train ensemble model")
 ensemble_parser.add_argument("--target", default="CHEMBL238", help="ChEMBL target ID")
@@ -731,6 +783,7 @@ Basic Commands:
   assess             Run pIC50/3D/ADMET/synthesis/reaction triage
   train-gnn          Train Graph Neural Network
   train-elt          Train elastic-looped Transformer model
+  deep-cv            Cross-validate GNN and multimodal ELT
   train-ensemble     Train ensemble model
   active-learning    Suggest next compounds to test
   chat               Interactive chat with TxGemma AI
@@ -750,6 +803,9 @@ Examples:
 
   # Train ELT model with selectable loop budget
   python cli.py train-elt --target CHEMBL238 --loop-count 4 --epochs 20
+
+  # Cross-validate GNN and multimodal ELT on the CHEMBL238 snapshot
+  python cli.py deep-cv --folds 3 --epochs 2 --max-rows 240
 
   # Train ensemble
   python cli.py train-ensemble --include-xgboost --include-gnn

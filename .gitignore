@@ -165,11 +165,20 @@ raw_data/
 processed_data/
 !data/
 !data/demo_pic50_benchmark.csv
+!data/chembl_category_pic50_snapshot.csv
+!data/psychopharm_literature_reference.csv
 !models/
 !models/demo_cpu_pic50_model.json
+!models/chembl_category_cpu_pic50_model.json
 !artifacts/
 !artifacts/demo_cpu_benchmark.json
+!artifacts/chembl_category_cpu_benchmark.json
 !artifacts/elt_chembl238_smoke_report.json
+!artifacts/deep_cv_chembl238_report.json
+!artifacts/deep_cv_category_report.json
+!artifacts/chembl_category_pic50_snapshot.manifest.json
+!artifacts/psychopharm_literature_prediction_check.json
+artifacts/graph_cache/
 
 # Log Files
 *.log
@@ -229,7 +238,13 @@ checkpoint/
 artifacts/
 !artifacts/
 !artifacts/demo_cpu_benchmark.json
+!artifacts/chembl_category_cpu_benchmark.json
 !artifacts/elt_chembl238_smoke_report.json
+!artifacts/deep_cv_chembl238_report.json
+!artifacts/deep_cv_category_report.json
+!artifacts/chembl_category_pic50_snapshot.manifest.json
+!artifacts/psychopharm_literature_prediction_check.json
+artifacts/graph_cache/
 models/trained/
 models/checkpoints/
 models/artifacts/

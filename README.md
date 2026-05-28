@@ -52,7 +52,11 @@ Current implementation:
 
 - `src/models/elastic_looped_transformer.py` adds `ElasticLoopedPIC50Model` and
   `LitElasticLoopedPIC50`.
+- `MultimodalElasticLoopedPIC50Model` extends that path with ViT-style molecule
+  image patches plus descriptor tokens, leaving room for graph summary tokens.
 - `train-elt` exposes the model from the CLI.
+- `deep-cv` compares compact GNN and multimodal ELT runs on the same stable
+  scaffold folds.
 - The same checkpoint can be evaluated with shorter or longer loop schedules,
   making it a practical candidate for uncertainty and budget-sensitive pharma
   triage.
@@ -76,6 +80,51 @@ the literature mean, but it is about 0.3130 pIC50 closer than the Ridge baseline
 and roughly halves the methylphenidate fold error from about 21x to about 10x.
 
 Reference implementation: https://github.com/zapabob/elastic-looped-transformer
+
+Multimodal ELT/GNN cross-validation smoke run:
+
+```bash
+uv run python -B cli.py deep-cv --folds 3 --epochs 2 --max-rows 240
+```
+
+The checked report is `artifacts/deep_cv_chembl238_report.json`. This run uses
+the frozen CHEMBL238 snapshot, holds external rows out of CV, and evaluates 240
+CPU-sampled non-external rows with stable scaffold-hash folds. It is still a
+small smoke comparison, not a production benchmark: multimodal ELT averaged
+`R2 = -0.0342`, `RMSE = 1.1735`, `MAE = 0.9881`, `MSE loss = 1.3785`, while
+compact GNN averaged `R2 = -0.1055`, `RMSE = 1.2146`, `MAE = 1.0161`,
+`MSE loss = 1.4854`. The value is that the same
+fold policy now compares graph and ViT-style looped-Transformer candidates.
+
+Category-expanded scaffold CV run:
+
+```bash
+uv run python -B cli.py build-chembl-snapshot --targets CHEMBL224,CHEMBL218,CHEMBL253,CHEMBL233,CHEMBL236,CHEMBL238 --output data/chembl_category_pic50_snapshot.csv --manifest artifacts/chembl_category_pic50_snapshot.manifest.json --max-rows-per-target 300
+uv run python -B cli.py deep-cv --snapshot data/chembl_category_pic50_snapshot.csv --output artifacts/deep_cv_category_report.json --target ALL --folds 3 --epochs 2 --max-rows 0
+```
+
+This expands the CV evidence to psychedelic (`CHEMBL224`), cannabinoid
+(`CHEMBL218`, `CHEMBL253`), opioid (`CHEMBL233`, `CHEMBL236`), and
+phenethylamine-like structure labels. The checked category report uses 1,800
+ChEMBL rows, excludes 262 external rows from CV, and evaluates 1,538 rows with
+stable scaffold folds.
+
+| Model | Scope | n | R2 | RMSE | MAE | MSE loss |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| multimodal ELT | overall | 1,538 | 0.1413 | 1.2627 | 1.0510 | 1.5952 |
+| GNN | overall | 1,538 | 0.0118 | 1.3560 | 1.1249 | 1.8410 |
+| multimodal ELT | psychedelic | 272 | -0.5130 | 1.2497 | 0.9878 | 1.5616 |
+| GNN | psychedelic | 272 | -0.5412 | 1.2612 | 1.0163 | 1.5907 |
+| multimodal ELT | cannabinoid | 488 | 0.1243 | 1.3665 | 1.1450 | 1.8672 |
+| GNN | cannabinoid | 488 | 0.0032 | 1.4579 | 1.2177 | 2.1256 |
+| multimodal ELT | opioid | 519 | 0.0141 | 1.2454 | 1.0875 | 1.5511 |
+| GNN | opioid | 519 | -0.1291 | 1.3328 | 1.1560 | 1.7764 |
+| multimodal ELT | phenethylamine | 1,066 | 0.1576 | 1.3040 | 1.1024 | 1.7005 |
+| GNN | phenethylamine | 1,066 | 0.0022 | 1.4193 | 1.1932 | 2.0143 |
+
+The opioid slice includes checked mu-opioid (`CHEMBL233`) and delta-opioid
+(`CHEMBL236`) rows. Kappa-opioid (`CHEMBL237`) remains mapped in code, but the
+local ChEMBL fetch timed out before producing a checked snapshot.
 
 ## Pharma MVP Evidence Snapshot
 
@@ -120,6 +169,36 @@ useful MVP evidence because it exposes the full evaluation loop, not because it
 claims production-grade accuracy. The next pharma evaluation step is a governed
 multi-target ChEMBL or sponsor snapshot with locked data lineage, stronger
 models, calibration, drift monitoring, and lifecycle change control.
+
+Expanded psychopharmacology check:
+
+```bash
+uv run python -B scripts/run_psychopharm_literature_check.py
+```
+
+The expanded check uses `data/psychopharm_literature_reference.csv` and writes
+`artifacts/psychopharm_literature_prediction_check.json`. It compares local
+predictions with curated ChEMBL literature rows for Adderall as a
+d-amphetamine proxy, LSD, delta-9-THC, morphine, methylphenidate, and bkMDMA
+(methylone). Values are pX-style ChEMBL potency values (`Ki`, `IC50`, or
+`EC50`), so they are a psychopharmacology sanity check, not a harmonized
+endpoint validation.
+
+| Compound | Target | Literature mean pX | Predicted pIC50 | Delta | Fold error | Domain |
+| --- | --- | ---: | ---: | ---: | ---: | --- |
+| Adderall / d-amphetamine | DAT | 7.0367 | 5.9340 | -1.1027 | 12.6678 | out |
+| LSD | 5HT2A | 8.3186 | 6.7230 | -1.5956 | 39.4094 | out |
+| delta-9-THC | CB1 | 7.9650 | 7.9280 | -0.0370 | 1.0889 | in |
+| delta-9-THC | CB2 | 7.6800 | 6.4260 | -1.2540 | 17.9473 | out |
+| Morphine | mu-opioid | 8.6300 | 6.3950 | -2.2350 | 171.7908 | in |
+| Morphine | delta-opioid | 6.6850 | 6.1670 | -0.5180 | 3.2961 | in |
+| Methylphenidate | DAT | 7.3250 | 6.1540 | -1.1710 | 14.8252 | in |
+| bkMDMA / methylone | DAT | 6.8800 | 5.6640 | -1.2160 | 16.4437 | in |
+
+This is useful portfolio evidence because it surfaces where the model is already
+directional (delta-9-THC at CB1), where target-family calibration is weak
+(morphine at mu-opioid, LSD at 5HT2A), and where endpoint or species mismatch
+must be labeled before an LLM or reviewer quotes the result.
 
 The graph and README statistics are regenerated from local JSON evidence:
 

@@ -1,0 +1,322 @@
+{
+  "target": "CHEMBL238",
+  "device": "cpu",
+  "dataset": {
+    "path": "data/chembl238_pic50_snapshot.csv",
+    "target_rows": 2382,
+    "cv_rows": 240,
+    "external_holdout_rows": 261,
+    "targets": [
+      "CHEMBL238"
+    ]
+  },
+  "fold_policy": {
+    "method": "stable_scaffold_hash_modulo",
+    "folds": 3,
+    "random_seed": 42,
+    "max_rows": 240
+  },
+  "category_rules": {
+    "mode": "target_and_structure_multilabel",
+    "target_rules": {
+      "CHEMBL224": "psychedelic",
+      "CHEMBL218": "cannabinoid",
+      "CHEMBL253": "cannabinoid",
+      "CHEMBL1861": "cannabinoid",
+      "CHEMBL233": "opioid",
+      "CHEMBL236": "opioid",
+      "CHEMBL237": "opioid"
+    },
+    "structure_rules": {
+      "phenethylamine": "aromatic ring connected to an aliphatic carbon chain reaching nitrogen within two to three bonds"
+    },
+    "core_categories": [
+      "psychedelic",
+      "cannabinoid",
+      "opioid",
+      "phenethylamine"
+    ]
+  },
+  "training": {
+    "epochs": 2,
+    "hidden_dim": 32,
+    "descriptor_token_count": 4,
+    "image_grid_size": 16,
+    "image_patch_size": 4,
+    "loop_count": 4,
+    "batch_size": 32,
+    "learning_rate": 0.0005,
+    "target_standardization": "train_fold_zscore_inverse_transform"
+  },
+  "models": {
+    "multimodal_elt": {
+      "folds": [
+        {
+          "fold": 0,
+          "train_size": 146,
+          "test_size": 94,
+          "test_metrics": {
+            "n": 94,
+            "r2": -0.0599,
+            "rmse": 1.1267,
+            "mae": 0.9145,
+            "mse_loss": 1.2695
+          },
+          "losses": [
+            1.055223,
+            0.985002
+          ],
+          "train_loss_initial": 1.055223,
+          "train_loss_final": 0.985002,
+          "train_loss_mean": 1.020112,
+          "target_mean": 6.1579,
+          "target_std": 1.183,
+          "evidence_channels": [
+            "molecular_descriptor",
+            "molecule_render_vit_patch",
+            "graph_summary",
+            "elastic_looped_transformer"
+          ]
+        },
+        {
+          "fold": 1,
+          "train_size": 177,
+          "test_size": 63,
+          "test_metrics": {
+            "n": 63,
+            "r2": -0.0128,
+            "rmse": 1.2129,
+            "mae": 1.0677,
+            "mse_loss": 1.4712
+          },
+          "losses": [
+            1.02049,
+            0.969041
+          ],
+          "train_loss_initial": 1.02049,
+          "train_loss_final": 0.969041,
+          "train_loss_mean": 0.994765,
+          "target_mean": 6.3269,
+          "target_std": 1.1334,
+          "evidence_channels": [
+            "molecular_descriptor",
+            "molecule_render_vit_patch",
+            "graph_summary",
+            "elastic_looped_transformer"
+          ]
+        },
+        {
+          "fold": 2,
+          "train_size": 157,
+          "test_size": 83,
+          "test_metrics": {
+            "n": 83,
+            "r2": -0.0299,
+            "rmse": 1.181,
+            "mae": 0.9821,
+            "mse_loss": 1.3948
+          },
+          "losses": [
+            1.167706,
+            0.983993
+          ],
+          "train_loss_initial": 1.167706,
+          "train_loss_final": 0.983993,
+          "train_loss_mean": 1.075849,
+          "target_mean": 6.3001,
+          "target_std": 1.1522,
+          "evidence_channels": [
+            "molecular_descriptor",
+            "molecule_render_vit_patch",
+            "graph_summary",
+            "elastic_looped_transformer"
+          ]
+        }
+      ],
+      "mean_metrics": {
+        "r2": -0.0342,
+        "rmse": 1.1735,
+        "mae": 0.9881,
+        "mse_loss": 1.3785,
+        "n": 240
+      },
+      "category_metrics": {
+        "cannabinoid": {
+          "n": 0,
+          "r2": null,
+          "rmse": null,
+          "mae": null,
+          "mse_loss": null
+        },
+        "opioid": {
+          "n": 0,
+          "r2": null,
+          "rmse": null,
+          "mae": null,
+          "mse_loss": null
+        },
+        "other": {
+          "n": 113,
+          "r2": 0.0123,
+          "rmse": 1.2952,
+          "mae": 1.1044,
+          "mse_loss": 1.6775
+        },
+        "phenethylamine": {
+          "n": 127,
+          "r2": -0.0682,
+          "rmse": 1.0433,
+          "mae": 0.8657,
+          "mse_loss": 1.0885
+        },
+        "psychedelic": {
+          "n": 0,
+          "r2": null,
+          "rmse": null,
+          "mae": null,
+          "mse_loss": null
+        }
+      }
+    },
+    "gnn": {
+      "folds": [
+        {
+          "fold": 0,
+          "train_size": 146,
+          "test_size": 94,
+          "test_metrics": {
+            "n": 94,
+            "r2": -0.0088,
+            "rmse": 1.0992,
+            "mae": 0.8918,
+            "mse_loss": 1.2083
+          },
+          "losses": [
+            1.065442,
+            1.082333
+          ],
+          "train_loss_initial": 1.065442,
+          "train_loss_final": 1.082333,
+          "train_loss_mean": 1.073888,
+          "target_mean": 6.1579,
+          "target_std": 1.183,
+          "evidence_channels": [
+            "molecular_graph",
+            "gcn"
+          ]
+        },
+        {
+          "fold": 1,
+          "train_size": 177,
+          "test_size": 63,
+          "test_metrics": {
+            "n": 63,
+            "r2": -0.2474,
+            "rmse": 1.3461,
+            "mae": 1.1576,
+            "mse_loss": 1.812
+          },
+          "losses": [
+            1.169731,
+            1.145148
+          ],
+          "train_loss_initial": 1.169731,
+          "train_loss_final": 1.145148,
+          "train_loss_mean": 1.15744,
+          "target_mean": 6.3269,
+          "target_std": 1.1334,
+          "evidence_channels": [
+            "molecular_graph",
+            "gcn"
+          ]
+        },
+        {
+          "fold": 2,
+          "train_size": 157,
+          "test_size": 83,
+          "test_metrics": {
+            "n": 83,
+            "r2": -0.0604,
+            "rmse": 1.1984,
+            "mae": 0.9989,
+            "mse_loss": 1.436
+          },
+          "losses": [
+            1.032212,
+            1.00993
+          ],
+          "train_loss_initial": 1.032212,
+          "train_loss_final": 1.00993,
+          "train_loss_mean": 1.021071,
+          "target_mean": 6.3001,
+          "target_std": 1.1522,
+          "evidence_channels": [
+            "molecular_graph",
+            "gcn"
+          ]
+        }
+      ],
+      "mean_metrics": {
+        "r2": -0.1055,
+        "rmse": 1.2146,
+        "mae": 1.0161,
+        "mse_loss": 1.4854,
+        "n": 240
+      },
+      "category_metrics": {
+        "cannabinoid": {
+          "n": 0,
+          "r2": null,
+          "rmse": null,
+          "mae": null,
+          "mse_loss": null
+        },
+        "opioid": {
+          "n": 0,
+          "r2": null,
+          "rmse": null,
+          "mae": null,
+          "mse_loss": null
+        },
+        "other": {
+          "n": 113,
+          "r2": -0.0772,
+          "rmse": 1.3526,
+          "mae": 1.1435,
+          "mse_loss": 1.8294
+        },
+        "phenethylamine": {
+          "n": 127,
+          "r2": -0.0835,
+          "rmse": 1.0507,
+          "mae": 0.8697,
+          "mse_loss": 1.104
+        },
+        "psychedelic": {
+          "n": 0,
+          "r2": null,
+          "rmse": null,
+          "mae": null,
+          "mse_loss": null
+        }
+      }
+    }
+  },
+  "external_references": {
+    "github_repo": "zapabob/elastic-looped-transformer",
+    "github_url": "https://github.com/zapabob/elastic-looped-transformer",
+    "hf_author": "zapabobouj",
+    "hf_model_example": "zapabobouj/AEGIS-Phi3.5-Enhanced",
+    "hf_api": "https://huggingface.co/api/models?author=zapabobouj",
+    "arxiv_id": "2604.09168",
+    "arxiv_url": "https://arxiv.org/abs/2604.09168"
+  },
+  "context_of_use": {
+    "decision_role": "research_triage_only",
+    "not_for": [
+      "clinical_decision",
+      "regulatory_submission",
+      "patient_care"
+    ]
+  }
+}
