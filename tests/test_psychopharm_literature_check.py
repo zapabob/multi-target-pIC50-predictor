@@ -11,7 +11,8 @@ from scripts.run_psychopharm_literature_check import run_psychopharm_literature_
 class _FakePrediction:
     smiles: str
     target: str
-    pIC50_prediction: float
+    endpoint: str
+    endpoint_prediction: float
     uncertainty: float
     applicability_domain: dict[str, object]
     model_version: str = "fake-v1"
@@ -20,11 +21,13 @@ class _FakePrediction:
 
 
 class _FakePredictor:
-    def predict(self, smiles: str, target: str) -> _FakePrediction:
+    def predict(self, smiles: str, target: str, endpoint: str = "pIC50") -> _FakePrediction:
+        predictions = {"pIC50": 7.0, "pKi": 8.0}
         return _FakePrediction(
             smiles=smiles,
             target=target,
-            pIC50_prediction=7.0,
+            endpoint=endpoint,
+            endpoint_prediction=predictions[endpoint],
             uncertainty=0.25,
             applicability_domain={"in_domain": True},
         )
@@ -59,7 +62,13 @@ def test_psychopharm_literature_check_groups_reference_values(tmp_path: Path):
     assert comparison["model_target"] == "CHEMBL224"
     assert comparison["literature"]["n"] == 2
     assert comparison["literature"]["mean_pX"] == 8.195
-    assert comparison["prediction"]["pIC50"] == 7.0
-    assert comparison["prediction_minus_literature_mean"] == -1.195
-    assert comparison["fold_error_vs_literature_mean"] > 15
+    assert comparison["literature_by_endpoint"]["pKi"]["n"] == 1
+    assert comparison["literature_by_endpoint"]["pKi"]["mean"] == 8.5
+    assert comparison["literature_by_endpoint"]["pIC50"]["n"] == 0
+    assert comparison["literature_by_endpoint"]["pEC50"]["mean"] == 7.89
+    assert comparison["predictions"]["pIC50"]["value"] == 7.0
+    assert comparison["predictions"]["pKi"]["value"] == 8.0
+    assert comparison["endpoint_deltas"]["pKi"]["prediction_minus_literature_mean"] == -0.5
+    assert comparison["endpoint_deltas"]["pKi"]["fold_error_vs_literature_mean"] > 3
+    assert "mol_wt" in comparison["rdkit_features"]
     assert "CHEMBL5113537" in comparison["literature"]["document_chembl_ids"]

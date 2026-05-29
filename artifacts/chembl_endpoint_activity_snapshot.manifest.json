@@ -1,0 +1,210 @@
+{
+  "snapshot_id": "chembl-endpoint-20260529T111633Z",
+  "created_at_utc": "2026-05-29T11:21:41.109601+00:00",
+  "source": "ChEMBL webresource client",
+  "row_count": 2103,
+  "csv_path": "data/chembl_endpoint_activity_snapshot.csv",
+  "csv_sha256": "532bec0827faeb507b5492bde4316b76ed499efd091696473b59c8d7f4fbfe73",
+  "schema": [
+    "snapshot_id",
+    "target",
+    "target_name",
+    "endpoint",
+    "standard_type",
+    "molecule_chembl_id",
+    "canonical_smiles",
+    "p_value",
+    "standard_value_nM",
+    "split",
+    "scaffold_smiles",
+    "source"
+  ],
+  "targets": {
+    "CHEMBL238": {
+      "target_name": "DAT",
+      "row_count": 267,
+      "endpoints": {
+        "pIC50": {
+          "standard_type": "IC50",
+          "row_count": 130,
+          "split_counts": {
+            "external": 20,
+            "scaffold_test": 10,
+            "train": 100
+          },
+          "source": "ChEMBL"
+        },
+        "pKi": {
+          "standard_type": "Ki",
+          "row_count": 137,
+          "split_counts": {
+            "external": 16,
+            "scaffold_test": 12,
+            "train": 109
+          },
+          "source": "ChEMBL"
+        }
+      }
+    },
+    "CHEMBL224": {
+      "target_name": "5HT2A",
+      "row_count": 358,
+      "endpoints": {
+        "pIC50": {
+          "standard_type": "IC50",
+          "row_count": 194,
+          "split_counts": {
+            "external": 13,
+            "scaffold_test": 12,
+            "train": 169
+          },
+          "source": "ChEMBL"
+        },
+        "pKi": {
+          "standard_type": "Ki",
+          "row_count": 164,
+          "split_counts": {
+            "external": 27,
+            "scaffold_test": 17,
+            "train": 120
+          },
+          "source": "ChEMBL"
+        }
+      }
+    },
+    "CHEMBL218": {
+      "target_name": "CB1",
+      "row_count": 348,
+      "endpoints": {
+        "pIC50": {
+          "standard_type": "IC50",
+          "row_count": 194,
+          "split_counts": {
+            "external": 13,
+            "scaffold_test": 24,
+            "train": 157
+          },
+          "source": "ChEMBL"
+        },
+        "pKi": {
+          "standard_type": "Ki",
+          "row_count": 154,
+          "split_counts": {
+            "external": 22,
+            "scaffold_test": 15,
+            "train": 117
+          },
+          "source": "ChEMBL"
+        }
+      }
+    },
+    "CHEMBL253": {
+      "target_name": "CB2",
+      "row_count": 377,
+      "endpoints": {
+        "pIC50": {
+          "standard_type": "IC50",
+          "row_count": 194,
+          "split_counts": {
+            "external": 29,
+            "scaffold_test": 17,
+            "train": 148
+          },
+          "source": "ChEMBL"
+        },
+        "pKi": {
+          "standard_type": "Ki",
+          "row_count": 183,
+          "split_counts": {
+            "external": 20,
+            "scaffold_test": 32,
+            "train": 131
+          },
+          "source": "ChEMBL"
+        }
+      }
+    },
+    "CHEMBL233": {
+      "target_name": "\u03bc-opioid",
+      "row_count": 387,
+      "endpoints": {
+        "pIC50": {
+          "standard_type": "IC50",
+          "row_count": 190,
+          "split_counts": {
+            "external": 21,
+            "scaffold_test": 22,
+            "train": 147
+          },
+          "source": "ChEMBL"
+        },
+        "pKi": {
+          "standard_type": "Ki",
+          "row_count": 197,
+          "split_counts": {
+            "external": 10,
+            "scaffold_test": 30,
+            "train": 157
+          },
+          "source": "ChEMBL"
+        }
+      }
+    },
+    "CHEMBL236": {
+      "target_name": "\u03b4-opioid",
+      "row_count": 366,
+      "endpoints": {
+        "pIC50": {
+          "standard_type": "IC50",
+          "row_count": 179,
+          "split_counts": {
+            "external": 21,
+            "scaffold_test": 14,
+            "train": 144
+          },
+          "source": "ChEMBL"
+        },
+        "pKi": {
+          "standard_type": "Ki",
+          "row_count": 187,
+          "split_counts": {
+            "external": 36,
+            "scaffold_test": 21,
+            "train": 130
+          },
+          "source": "ChEMBL"
+        }
+      }
+    }
+  },
+  "filters": {
+    "standard_types": {
+      "pIC50": "IC50",
+      "pKi": "Ki"
+    },
+    "standard_relation": "=",
+    "standard_units": "nM",
+    "p_value_range": [
+      0,
+      15
+    ],
+    "max_rows_per_target_endpoint": 200
+  },
+  "split_policy": {
+    "method": "stable_endpoint_scaffold_hash",
+    "random_seed": 42,
+    "scaffold_test_fraction": 0.15,
+    "external_fraction": 0.15,
+    "unit": "endpoint-specific Murcko scaffold"
+  },
+  "context_of_use": {
+    "intended_use": "fixed endpoint benchmark for CPU pIC50/pKi model evaluation",
+    "decision_role": "research_triage_only",
+    "not_for": [
+      "clinical_decision",
+      "regulatory_submission",
+      "manufacturing_release",
+      "patient_care"
+    ]
+  }
+}

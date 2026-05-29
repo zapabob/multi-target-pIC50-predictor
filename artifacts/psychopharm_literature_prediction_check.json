@@ -1,6 +1,6 @@
 {
   "context_of_use": {
-    "intended_use": "Research-only psychopharmacology sanity check comparing curated ChEMBL activity values with local pIC50 predictions.",
+    "intended_use": "Research-only psychopharmacology sanity check comparing curated ChEMBL activity values with local endpoint-specific pIC50 and pKi predictions.",
     "decision_role": "research_triage_only",
     "not_for": [
       "clinical_decision",
@@ -10,12 +10,21 @@
     ]
   },
   "reference_path": "data/psychopharm_literature_reference.csv",
-  "model_path": "models/chembl_category_cpu_pic50_model.json",
+  "model_path": "models/chembl_endpoint_cpu_model.json",
   "summary": {
-    "compound_count": 6,
-    "comparison_count": 8,
-    "reference_row_count": 33,
-    "mean_abs_delta_pX": 1.1412
+    "compound_count": 10,
+    "comparison_count": 15,
+    "reference_row_count": 55,
+    "literature_endpoints": [
+      "pEC50",
+      "pIC50",
+      "pKi"
+    ],
+    "prediction_endpoints": [
+      "pIC50",
+      "pKi"
+    ],
+    "mean_abs_delta_pX": 0.9653
   },
   "comparisons": [
     {
@@ -23,6 +32,17 @@
       "compound_proxy": "d-amphetamine",
       "compound_chembl_id": "CHEMBL612",
       "canonical_smiles": "C[C@H](N)Cc1ccccc1",
+      "rdkit_features": {
+        "mol_wt": 135.21,
+        "logp": 1.5763,
+        "tpsa": 26.02,
+        "hbd": 1.0,
+        "hba": 1.0,
+        "rotatable_bonds": 2.0,
+        "aromatic_rings": 1.0,
+        "fraction_csp3": 0.333333,
+        "qed": 0.654216
+      },
       "literature_targets": [
         "CHEMBL238"
       ],
@@ -69,12 +89,138 @@
           "d-amphetamine proxy for mixed amphetamine salts"
         ]
       },
+      "literature_by_endpoint": {
+        "pEC50": {
+          "n": 1,
+          "mean": 7.61,
+          "median": 7.61,
+          "sd": 0.0,
+          "sem": 0.0,
+          "standard_values_nM": [
+            24.8
+          ],
+          "values": [
+            7.61
+          ],
+          "document_chembl_ids": [
+            "CHEMBL1926662"
+          ],
+          "years": [
+            2011
+          ],
+          "dois": [
+            "10.1016/j.bmc.2011.10.007"
+          ],
+          "pubmed_ids": [
+            "22037049"
+          ],
+          "comparability_notes": [
+            "d-amphetamine proxy for mixed amphetamine salts"
+          ]
+        },
+        "pIC50": {
+          "n": 1,
+          "mean": 6.54,
+          "median": 6.54,
+          "sd": 0.0,
+          "sem": 0.0,
+          "standard_values_nM": [
+            288.4
+          ],
+          "values": [
+            6.54
+          ],
+          "document_chembl_ids": [
+            "CHEMBL2390840"
+          ],
+          "years": [
+            2013
+          ],
+          "dois": [
+            "10.1016/j.bmcl.2013.03.066"
+          ],
+          "pubmed_ids": [
+            "23602445"
+          ],
+          "comparability_notes": [
+            "d-amphetamine proxy for mixed amphetamine salts"
+          ]
+        },
+        "pKi": {
+          "n": 1,
+          "mean": 6.96,
+          "median": 6.96,
+          "sd": 0.0,
+          "sem": 0.0,
+          "standard_values_nM": [
+            109.0
+          ],
+          "values": [
+            6.96
+          ],
+          "document_chembl_ids": [
+            "CHEMBL2390840"
+          ],
+          "years": [
+            2013
+          ],
+          "dois": [
+            "10.1016/j.bmcl.2013.03.066"
+          ],
+          "pubmed_ids": [
+            "23602445"
+          ],
+          "comparability_notes": [
+            "d-amphetamine proxy for mixed amphetamine salts"
+          ]
+        }
+      },
+      "predictions": {
+        "pIC50": {
+          "target": "CHEMBL238",
+          "endpoint": "pIC50",
+          "value": 7.596,
+          "uncertainty": 1.039,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": false,
+            "out_of_domain_features": [
+              "mol_wt"
+            ],
+            "distance": 0.0042,
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "pKi": {
+          "target": "CHEMBL238",
+          "endpoint": "pKi",
+          "value": 6.462,
+          "uncertainty": 1.13,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": false,
+            "out_of_domain_features": [
+              "mol_wt",
+              "logp"
+            ],
+            "distance": 0.034,
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        }
+      },
       "prediction": {
         "target": "CHEMBL238",
-        "pIC50": 5.934,
-        "uncertainty": 0.827,
-        "model_version": "demo-cpu-ridge-v1",
-        "model_kind": "cpu_descriptor_ridge",
+        "endpoint": "pIC50",
+        "value": 7.596,
+        "uncertainty": 1.039,
+        "model_version": "demo-cpu-endpoint-ridge-v1",
+        "model_kind": "cpu_descriptor_endpoint_ridge",
         "device": "cpu",
         "applicability_domain": {
           "method": "descriptor_min_max",
@@ -82,18 +228,879 @@
           "out_of_domain_features": [
             "mol_wt"
           ],
-          "distance": 0.0092,
+          "distance": 0.0042,
           "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
         }
       },
-      "prediction_minus_literature_mean": -1.1027,
-      "fold_error_vs_literature_mean": 12.6678
+      "endpoint_deltas": {
+        "pIC50": {
+          "prediction_minus_literature_mean": 1.056,
+          "fold_error_vs_literature_mean": 11.3763
+        },
+        "pKi": {
+          "prediction_minus_literature_mean": -0.498,
+          "fold_error_vs_literature_mean": 3.1477
+        }
+      },
+      "prediction_minus_literature_mean": 0.5593,
+      "fold_error_vs_literature_mean": 3.6249
+    },
+    {
+      "compound_label": "CBD",
+      "compound_proxy": "Cannabidiol",
+      "compound_chembl_id": "CHEMBL190461",
+      "canonical_smiles": "C=C(C)[C@@H]1CCC(C)=C[C@H]1c1c(O)cc(CCCCC)cc1O",
+      "rdkit_features": {
+        "mol_wt": 314.469,
+        "logp": 5.8465,
+        "tpsa": 40.46,
+        "hbd": 2.0,
+        "hba": 2.0,
+        "rotatable_bonds": 6.0,
+        "aromatic_rings": 1.0,
+        "fraction_csp3": 0.52381,
+        "qed": 0.510775
+      },
+      "literature_targets": [
+        "CHEMBL218"
+      ],
+      "model_target": "CHEMBL218",
+      "target_label": "CB1",
+      "literature": {
+        "n": 4,
+        "mean_pX": 5.56,
+        "median_pX": 5.52,
+        "sd_pX": 0.2173,
+        "sem_pX": 0.1086,
+        "endpoint_types": [
+          "IC50",
+          "Ki"
+        ],
+        "standard_values_nM": [
+          2400.0,
+          4350.0,
+          1459.0,
+          3800.0
+        ],
+        "pX_values": [
+          5.62,
+          5.36,
+          5.84,
+          5.42
+        ],
+        "document_chembl_ids": [
+          "CHEMBL1155461",
+          "CHEMBL3232786",
+          "CHEMBL4422692",
+          "CHEMBL5528023"
+        ],
+        "years": [
+          2010,
+          2013,
+          2019,
+          2024
+        ],
+        "dois": [
+          "10.1016/j.ejmech.2023.116048",
+          "10.1021/acs.jnatprod.8b00874",
+          "10.1021/jm4005626",
+          "10.1021/jm9018756"
+        ],
+        "pubmed_ids": [
+          "20218623",
+          "23865723",
+          "30816712",
+          "38150961"
+        ],
+        "comparability_notes": [
+          "direct target binding",
+          "direct target functional"
+        ]
+      },
+      "literature_by_endpoint": {
+        "pIC50": {
+          "n": 1,
+          "mean": 5.42,
+          "median": 5.42,
+          "sd": 0.0,
+          "sem": 0.0,
+          "standard_values_nM": [
+            3800.0
+          ],
+          "values": [
+            5.42
+          ],
+          "document_chembl_ids": [
+            "CHEMBL5528023"
+          ],
+          "years": [
+            2024
+          ],
+          "dois": [
+            "10.1016/j.ejmech.2023.116048"
+          ],
+          "pubmed_ids": [
+            "38150961"
+          ],
+          "comparability_notes": [
+            "direct target functional"
+          ]
+        },
+        "pKi": {
+          "n": 3,
+          "mean": 5.6067,
+          "median": 5.62,
+          "sd": 0.2403,
+          "sem": 0.1387,
+          "standard_values_nM": [
+            2400.0,
+            4350.0,
+            1459.0
+          ],
+          "values": [
+            5.62,
+            5.36,
+            5.84
+          ],
+          "document_chembl_ids": [
+            "CHEMBL1155461",
+            "CHEMBL3232786",
+            "CHEMBL4422692"
+          ],
+          "years": [
+            2010,
+            2013,
+            2019
+          ],
+          "dois": [
+            "10.1021/acs.jnatprod.8b00874",
+            "10.1021/jm4005626",
+            "10.1021/jm9018756"
+          ],
+          "pubmed_ids": [
+            "20218623",
+            "23865723",
+            "30816712"
+          ],
+          "comparability_notes": [
+            "direct target binding"
+          ]
+        }
+      },
+      "predictions": {
+        "pIC50": {
+          "target": "CHEMBL218",
+          "endpoint": "pIC50",
+          "value": 5.568,
+          "uncertainty": 0.871,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": false,
+            "out_of_domain_features": [
+              "mol_wt"
+            ],
+            "distance": 0.0176,
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "pKi": {
+          "target": "CHEMBL218",
+          "endpoint": "pKi",
+          "value": 8.224,
+          "uncertainty": 0.989,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": true,
+            "out_of_domain_features": [],
+            "distance": 0.0,
+            "warning": null
+          }
+        }
+      },
+      "prediction": {
+        "target": "CHEMBL218",
+        "endpoint": "pIC50",
+        "value": 5.568,
+        "uncertainty": 0.871,
+        "model_version": "demo-cpu-endpoint-ridge-v1",
+        "model_kind": "cpu_descriptor_endpoint_ridge",
+        "device": "cpu",
+        "applicability_domain": {
+          "method": "descriptor_min_max",
+          "in_domain": false,
+          "out_of_domain_features": [
+            "mol_wt"
+          ],
+          "distance": 0.0176,
+          "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+        }
+      },
+      "endpoint_deltas": {
+        "pIC50": {
+          "prediction_minus_literature_mean": 0.148,
+          "fold_error_vs_literature_mean": 1.406
+        },
+        "pKi": {
+          "prediction_minus_literature_mean": 2.6173,
+          "fold_error_vs_literature_mean": 414.2858
+        }
+      },
+      "prediction_minus_literature_mean": 0.008,
+      "fold_error_vs_literature_mean": 1.0186
+    },
+    {
+      "compound_label": "CBD",
+      "compound_proxy": "Cannabidiol",
+      "compound_chembl_id": "CHEMBL190461",
+      "canonical_smiles": "C=C(C)[C@@H]1CCC(C)=C[C@H]1c1c(O)cc(CCCCC)cc1O",
+      "rdkit_features": {
+        "mol_wt": 314.469,
+        "logp": 5.8465,
+        "tpsa": 40.46,
+        "hbd": 2.0,
+        "hba": 2.0,
+        "rotatable_bonds": 6.0,
+        "aromatic_rings": 1.0,
+        "fraction_csp3": 0.52381,
+        "qed": 0.510775
+      },
+      "literature_targets": [
+        "CHEMBL253"
+      ],
+      "model_target": "CHEMBL253",
+      "target_label": "CB2",
+      "literature": {
+        "n": 3,
+        "mean_pX": 5.6567,
+        "median_pX": 5.54,
+        "sd_pX": 0.7221,
+        "sem_pX": 0.4169,
+        "endpoint_types": [
+          "Ki"
+        ],
+        "standard_values_nM": [
+          10000.0,
+          2860.0,
+          372.0
+        ],
+        "pX_values": [
+          5.0,
+          5.54,
+          6.43
+        ],
+        "document_chembl_ids": [
+          "CHEMBL1155461",
+          "CHEMBL3232786",
+          "CHEMBL4422692"
+        ],
+        "years": [
+          2010,
+          2013,
+          2019
+        ],
+        "dois": [
+          "10.1021/acs.jnatprod.8b00874",
+          "10.1021/jm4005626",
+          "10.1021/jm9018756"
+        ],
+        "pubmed_ids": [
+          "20218623",
+          "23865723",
+          "30816712"
+        ],
+        "comparability_notes": [
+          "direct target binding"
+        ]
+      },
+      "literature_by_endpoint": {
+        "pKi": {
+          "n": 3,
+          "mean": 5.6567,
+          "median": 5.54,
+          "sd": 0.7221,
+          "sem": 0.4169,
+          "standard_values_nM": [
+            10000.0,
+            2860.0,
+            372.0
+          ],
+          "values": [
+            5.0,
+            5.54,
+            6.43
+          ],
+          "document_chembl_ids": [
+            "CHEMBL1155461",
+            "CHEMBL3232786",
+            "CHEMBL4422692"
+          ],
+          "years": [
+            2010,
+            2013,
+            2019
+          ],
+          "dois": [
+            "10.1021/acs.jnatprod.8b00874",
+            "10.1021/jm4005626",
+            "10.1021/jm9018756"
+          ],
+          "pubmed_ids": [
+            "20218623",
+            "23865723",
+            "30816712"
+          ],
+          "comparability_notes": [
+            "direct target binding"
+          ]
+        },
+        "pIC50": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "sd": null,
+          "sem": null,
+          "standard_values_nM": [],
+          "values": [],
+          "document_chembl_ids": [],
+          "years": [],
+          "dois": [],
+          "pubmed_ids": [],
+          "comparability_notes": []
+        }
+      },
+      "predictions": {
+        "pIC50": {
+          "target": "CHEMBL253",
+          "endpoint": "pIC50",
+          "value": 8.255,
+          "uncertainty": 1.217,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": false,
+            "out_of_domain_features": [
+              "mol_wt"
+            ],
+            "distance": 0.0042,
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "pKi": {
+          "target": "CHEMBL253",
+          "endpoint": "pKi",
+          "value": 8.545,
+          "uncertainty": 0.828,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": true,
+            "out_of_domain_features": [],
+            "distance": 0.0,
+            "warning": null
+          }
+        }
+      },
+      "prediction": {
+        "target": "CHEMBL253",
+        "endpoint": "pIC50",
+        "value": 8.255,
+        "uncertainty": 1.217,
+        "model_version": "demo-cpu-endpoint-ridge-v1",
+        "model_kind": "cpu_descriptor_endpoint_ridge",
+        "device": "cpu",
+        "applicability_domain": {
+          "method": "descriptor_min_max",
+          "in_domain": false,
+          "out_of_domain_features": [
+            "mol_wt"
+          ],
+          "distance": 0.0042,
+          "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+        }
+      },
+      "endpoint_deltas": {
+        "pIC50": {
+          "prediction_minus_literature_mean": null,
+          "fold_error_vs_literature_mean": null
+        },
+        "pKi": {
+          "prediction_minus_literature_mean": 2.8883,
+          "fold_error_vs_literature_mean": 773.2145
+        }
+      },
+      "prediction_minus_literature_mean": 2.5983,
+      "fold_error_vs_literature_mean": 396.5519
+    },
+    {
+      "compound_label": "CBN",
+      "compound_proxy": "Cannabinol",
+      "compound_chembl_id": "CHEMBL74415",
+      "canonical_smiles": "CCCCCc1cc(O)c2c(c1)OC(C)(C)c1ccc(C)cc1-2",
+      "rdkit_features": {
+        "mol_wt": 310.437,
+        "logp": 5.72782,
+        "tpsa": 29.46,
+        "hbd": 1.0,
+        "hba": 2.0,
+        "rotatable_bonds": 4.0,
+        "aromatic_rings": 2.0,
+        "fraction_csp3": 0.428571,
+        "qed": 0.730913
+      },
+      "literature_targets": [
+        "CHEMBL218"
+      ],
+      "model_target": "CHEMBL218",
+      "target_label": "CB1",
+      "literature": {
+        "n": 4,
+        "mean_pX": 7.13,
+        "median_pX": 7.06,
+        "sd_pX": 0.5713,
+        "sem_pX": 0.2856,
+        "endpoint_types": [
+          "EC50",
+          "Ki"
+        ],
+        "standard_values_nM": [
+          308.0,
+          13.0,
+          100.0,
+          75.0
+        ],
+        "pX_values": [
+          6.51,
+          7.89,
+          7.0,
+          7.12
+        ],
+        "document_chembl_ids": [
+          "CHEMBL1133684",
+          "CHEMBL4138251",
+          "CHEMBL4422692",
+          "CHEMBL6083178"
+        ],
+        "years": [
+          2000,
+          2018,
+          2019,
+          2024
+        ],
+        "dois": [
+          "10.1016/j.ejmech.2024.116164",
+          "10.1021/acs.jnatprod.7b00946",
+          "10.1021/acs.jnatprod.8b00874",
+          "10.1021/jm0001572"
+        ],
+        "pubmed_ids": [
+          "11020293",
+          "29240420",
+          "30816712",
+          "38417219"
+        ],
+        "comparability_notes": [
+          "direct target binding",
+          "direct target functional"
+        ]
+      },
+      "literature_by_endpoint": {
+        "pEC50": {
+          "n": 1,
+          "mean": 7.12,
+          "median": 7.12,
+          "sd": 0.0,
+          "sem": 0.0,
+          "standard_values_nM": [
+            75.0
+          ],
+          "values": [
+            7.12
+          ],
+          "document_chembl_ids": [
+            "CHEMBL4138251"
+          ],
+          "years": [
+            2018
+          ],
+          "dois": [
+            "10.1021/acs.jnatprod.7b00946"
+          ],
+          "pubmed_ids": [
+            "29240420"
+          ],
+          "comparability_notes": [
+            "direct target functional"
+          ]
+        },
+        "pKi": {
+          "n": 3,
+          "mean": 7.1333,
+          "median": 7.0,
+          "sd": 0.6996,
+          "sem": 0.4039,
+          "standard_values_nM": [
+            308.0,
+            13.0,
+            100.0
+          ],
+          "values": [
+            6.51,
+            7.89,
+            7.0
+          ],
+          "document_chembl_ids": [
+            "CHEMBL1133684",
+            "CHEMBL4422692",
+            "CHEMBL6083178"
+          ],
+          "years": [
+            2000,
+            2019,
+            2024
+          ],
+          "dois": [
+            "10.1016/j.ejmech.2024.116164",
+            "10.1021/acs.jnatprod.8b00874",
+            "10.1021/jm0001572"
+          ],
+          "pubmed_ids": [
+            "11020293",
+            "30816712",
+            "38417219"
+          ],
+          "comparability_notes": [
+            "direct target binding"
+          ]
+        },
+        "pIC50": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "sd": null,
+          "sem": null,
+          "standard_values_nM": [],
+          "values": [],
+          "document_chembl_ids": [],
+          "years": [],
+          "dois": [],
+          "pubmed_ids": [],
+          "comparability_notes": []
+        }
+      },
+      "predictions": {
+        "pIC50": {
+          "target": "CHEMBL218",
+          "endpoint": "pIC50",
+          "value": 5.819,
+          "uncertainty": 0.872,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": false,
+            "out_of_domain_features": [
+              "mol_wt"
+            ],
+            "distance": 0.0195,
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "pKi": {
+          "target": "CHEMBL218",
+          "endpoint": "pKi",
+          "value": 7.39,
+          "uncertainty": 0.989,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": true,
+            "out_of_domain_features": [],
+            "distance": 0.0,
+            "warning": null
+          }
+        }
+      },
+      "prediction": {
+        "target": "CHEMBL218",
+        "endpoint": "pIC50",
+        "value": 5.819,
+        "uncertainty": 0.872,
+        "model_version": "demo-cpu-endpoint-ridge-v1",
+        "model_kind": "cpu_descriptor_endpoint_ridge",
+        "device": "cpu",
+        "applicability_domain": {
+          "method": "descriptor_min_max",
+          "in_domain": false,
+          "out_of_domain_features": [
+            "mol_wt"
+          ],
+          "distance": 0.0195,
+          "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+        }
+      },
+      "endpoint_deltas": {
+        "pIC50": {
+          "prediction_minus_literature_mean": null,
+          "fold_error_vs_literature_mean": null
+        },
+        "pKi": {
+          "prediction_minus_literature_mean": 0.2567,
+          "fold_error_vs_literature_mean": 1.8059
+        }
+      },
+      "prediction_minus_literature_mean": -1.311,
+      "fold_error_vs_literature_mean": 20.4644
+    },
+    {
+      "compound_label": "CBN",
+      "compound_proxy": "Cannabinol",
+      "compound_chembl_id": "CHEMBL74415",
+      "canonical_smiles": "CCCCCc1cc(O)c2c(c1)OC(C)(C)c1ccc(C)cc1-2",
+      "rdkit_features": {
+        "mol_wt": 310.437,
+        "logp": 5.72782,
+        "tpsa": 29.46,
+        "hbd": 1.0,
+        "hba": 2.0,
+        "rotatable_bonds": 4.0,
+        "aromatic_rings": 2.0,
+        "fraction_csp3": 0.428571,
+        "qed": 0.730913
+      },
+      "literature_targets": [
+        "CHEMBL253"
+      ],
+      "model_target": "CHEMBL253",
+      "target_label": "CB2",
+      "literature": {
+        "n": 4,
+        "mean_pX": 7.075,
+        "median_pX": 6.96,
+        "sd_pX": 0.5178,
+        "sem_pX": 0.2589,
+        "endpoint_types": [
+          "EC50",
+          "Ki"
+        ],
+        "standard_values_nM": [
+          126.4,
+          96.0,
+          16.0,
+          261.2
+        ],
+        "pX_values": [
+          6.9,
+          7.02,
+          7.8,
+          6.58
+        ],
+        "document_chembl_ids": [
+          "CHEMBL1130395",
+          "CHEMBL1133684",
+          "CHEMBL4422692"
+        ],
+        "years": [
+          1997,
+          2000,
+          2019
+        ],
+        "dois": [
+          "10.1021/acs.jnatprod.8b00874",
+          "10.1021/jm0001572",
+          "10.1021/jm970126f"
+        ],
+        "pubmed_ids": [
+          "11020293",
+          "30816712",
+          "9379442"
+        ],
+        "comparability_notes": [
+          "cross-species receptor family",
+          "direct target binding",
+          "direct target functional"
+        ]
+      },
+      "literature_by_endpoint": {
+        "pEC50": {
+          "n": 1,
+          "mean": 6.58,
+          "median": 6.58,
+          "sd": 0.0,
+          "sem": 0.0,
+          "standard_values_nM": [
+            261.2
+          ],
+          "values": [
+            6.58
+          ],
+          "document_chembl_ids": [
+            "CHEMBL1130395"
+          ],
+          "years": [
+            1997
+          ],
+          "dois": [
+            "10.1021/jm970126f"
+          ],
+          "pubmed_ids": [
+            "9379442"
+          ],
+          "comparability_notes": [
+            "direct target functional"
+          ]
+        },
+        "pKi": {
+          "n": 3,
+          "mean": 7.24,
+          "median": 7.02,
+          "sd": 0.4887,
+          "sem": 0.2821,
+          "standard_values_nM": [
+            126.4,
+            96.0,
+            16.0
+          ],
+          "values": [
+            6.9,
+            7.02,
+            7.8
+          ],
+          "document_chembl_ids": [
+            "CHEMBL1130395",
+            "CHEMBL1133684",
+            "CHEMBL4422692"
+          ],
+          "years": [
+            1997,
+            2000,
+            2019
+          ],
+          "dois": [
+            "10.1021/acs.jnatprod.8b00874",
+            "10.1021/jm0001572",
+            "10.1021/jm970126f"
+          ],
+          "pubmed_ids": [
+            "11020293",
+            "30816712",
+            "9379442"
+          ],
+          "comparability_notes": [
+            "cross-species receptor family",
+            "direct target binding"
+          ]
+        },
+        "pIC50": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "sd": null,
+          "sem": null,
+          "standard_values_nM": [],
+          "values": [],
+          "document_chembl_ids": [],
+          "years": [],
+          "dois": [],
+          "pubmed_ids": [],
+          "comparability_notes": []
+        }
+      },
+      "predictions": {
+        "pIC50": {
+          "target": "CHEMBL253",
+          "endpoint": "pIC50",
+          "value": 7.356,
+          "uncertainty": 1.219,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": false,
+            "out_of_domain_features": [
+              "mol_wt"
+            ],
+            "distance": 0.0059,
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "pKi": {
+          "target": "CHEMBL253",
+          "endpoint": "pKi",
+          "value": 7.496,
+          "uncertainty": 0.828,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": true,
+            "out_of_domain_features": [],
+            "distance": 0.0,
+            "warning": null
+          }
+        }
+      },
+      "prediction": {
+        "target": "CHEMBL253",
+        "endpoint": "pIC50",
+        "value": 7.356,
+        "uncertainty": 1.219,
+        "model_version": "demo-cpu-endpoint-ridge-v1",
+        "model_kind": "cpu_descriptor_endpoint_ridge",
+        "device": "cpu",
+        "applicability_domain": {
+          "method": "descriptor_min_max",
+          "in_domain": false,
+          "out_of_domain_features": [
+            "mol_wt"
+          ],
+          "distance": 0.0059,
+          "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+        }
+      },
+      "endpoint_deltas": {
+        "pIC50": {
+          "prediction_minus_literature_mean": null,
+          "fold_error_vs_literature_mean": null
+        },
+        "pKi": {
+          "prediction_minus_literature_mean": 0.256,
+          "fold_error_vs_literature_mean": 1.803
+        }
+      },
+      "prediction_minus_literature_mean": 0.281,
+      "fold_error_vs_literature_mean": 1.9099
     },
     {
       "compound_label": "D9THC",
       "compound_proxy": "Dronabinol",
       "compound_chembl_id": "CHEMBL465",
       "canonical_smiles": "CCCCCc1cc(O)c2c(c1)OC(C)(C)[C@@H]1CCC(C)=C[C@@H]21",
+      "rdkit_features": {
+        "mol_wt": 314.469,
+        "logp": 5.7358,
+        "tpsa": 29.46,
+        "hbd": 1.0,
+        "hba": 2.0,
+        "rotatable_bonds": 4.0,
+        "aromatic_rings": 1.0,
+        "fraction_csp3": 0.619048,
+        "qed": 0.567316
+      },
       "literature_targets": [
         "CHEMBL218"
       ],
@@ -161,29 +1168,171 @@
           "direct target binding"
         ]
       },
+      "literature_by_endpoint": {
+        "pIC50": {
+          "n": 1,
+          "mean": 8.55,
+          "median": 8.55,
+          "sd": 0.0,
+          "sem": 0.0,
+          "standard_values_nM": [
+            2.8
+          ],
+          "values": [
+            8.55
+          ],
+          "document_chembl_ids": [
+            "CHEMBL1926606"
+          ],
+          "years": [
+            2011
+          ],
+          "dois": [
+            "10.1021/np200610t"
+          ],
+          "pubmed_ids": [
+            "21999614"
+          ],
+          "comparability_notes": [
+            "direct target binding"
+          ]
+        },
+        "pKi": {
+          "n": 5,
+          "mean": 7.848,
+          "median": 7.77,
+          "sd": 0.4507,
+          "sem": 0.2016,
+          "standard_values_nM": [
+            41.0,
+            28.5,
+            17.0,
+            2.9,
+            10.0
+          ],
+          "values": [
+            7.39,
+            7.54,
+            7.77,
+            8.54,
+            8.0
+          ],
+          "document_chembl_ids": [
+            "CHEMBL1131164",
+            "CHEMBL1136287",
+            "CHEMBL1149535",
+            "CHEMBL1157439",
+            "CHEMBL1949601"
+          ],
+          "years": [
+            1998,
+            2003,
+            2007,
+            2008,
+            2012
+          ],
+          "dois": [
+            "10.1016/j.bmcl.2007.04.099",
+            "10.1016/j.bmcl.2008.05.073",
+            "10.1016/j.bmcl.2011.12.124",
+            "10.1016/s0960-894x(03)00729-7",
+            "10.1021/jm9803875"
+          ],
+          "pubmed_ids": [
+            "14505654",
+            "17531479",
+            "18522867",
+            "22284817",
+            "9784115"
+          ],
+          "comparability_notes": [
+            "direct target binding"
+          ]
+        }
+      },
+      "predictions": {
+        "pIC50": {
+          "target": "CHEMBL218",
+          "endpoint": "pIC50",
+          "value": 5.819,
+          "uncertainty": 0.871,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": false,
+            "out_of_domain_features": [
+              "mol_wt"
+            ],
+            "distance": 0.0176,
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "pKi": {
+          "target": "CHEMBL218",
+          "endpoint": "pKi",
+          "value": 7.941,
+          "uncertainty": 0.989,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": true,
+            "out_of_domain_features": [],
+            "distance": 0.0,
+            "warning": null
+          }
+        }
+      },
       "prediction": {
         "target": "CHEMBL218",
-        "pIC50": 7.928,
-        "uncertainty": 0.964,
-        "model_version": "demo-cpu-ridge-v1",
-        "model_kind": "cpu_descriptor_ridge",
+        "endpoint": "pIC50",
+        "value": 5.819,
+        "uncertainty": 0.871,
+        "model_version": "demo-cpu-endpoint-ridge-v1",
+        "model_kind": "cpu_descriptor_endpoint_ridge",
         "device": "cpu",
         "applicability_domain": {
           "method": "descriptor_min_max",
-          "in_domain": true,
-          "out_of_domain_features": [],
-          "distance": 0.0,
-          "warning": null
+          "in_domain": false,
+          "out_of_domain_features": [
+            "mol_wt"
+          ],
+          "distance": 0.0176,
+          "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
         }
       },
-      "prediction_minus_literature_mean": -0.037,
-      "fold_error_vs_literature_mean": 1.0889
+      "endpoint_deltas": {
+        "pIC50": {
+          "prediction_minus_literature_mean": -2.731,
+          "fold_error_vs_literature_mean": 538.2698
+        },
+        "pKi": {
+          "prediction_minus_literature_mean": 0.093,
+          "fold_error_vs_literature_mean": 1.2388
+        }
+      },
+      "prediction_minus_literature_mean": -2.146,
+      "fold_error_vs_literature_mean": 139.9587
     },
     {
       "compound_label": "D9THC",
       "compound_proxy": "Dronabinol",
       "compound_chembl_id": "CHEMBL465",
       "canonical_smiles": "CCCCCc1cc(O)c2c(c1)OC(C)(C)[C@@H]1CCC(C)=C[C@@H]21",
+      "rdkit_features": {
+        "mol_wt": 314.469,
+        "logp": 5.7358,
+        "tpsa": 29.46,
+        "hbd": 1.0,
+        "hba": 2.0,
+        "rotatable_bonds": 4.0,
+        "aromatic_rings": 1.0,
+        "fraction_csp3": 0.619048,
+        "qed": 0.567316
+      },
       "literature_targets": [
         "CHEMBL253"
       ],
@@ -244,31 +1393,157 @@
           "direct target binding"
         ]
       },
+      "literature_by_endpoint": {
+        "pKi": {
+          "n": 5,
+          "mean": 7.68,
+          "median": 7.49,
+          "sd": 0.4539,
+          "sem": 0.203,
+          "standard_values_nM": [
+            32.2,
+            36.0,
+            25.0,
+            3.3,
+            41.0
+          ],
+          "values": [
+            7.49,
+            7.44,
+            7.6,
+            8.48,
+            7.39
+          ],
+          "document_chembl_ids": [
+            "CHEMBL1130395",
+            "CHEMBL1133684",
+            "CHEMBL1136287",
+            "CHEMBL1149535",
+            "CHEMBL1157439"
+          ],
+          "years": [
+            1997,
+            2000,
+            2003,
+            2007,
+            2008
+          ],
+          "dois": [
+            "10.1016/j.bmcl.2007.04.099",
+            "10.1016/j.bmcl.2008.05.073",
+            "10.1016/s0960-894x(03)00729-7",
+            "10.1021/jm0001572",
+            "10.1021/jm970126f"
+          ],
+          "pubmed_ids": [
+            "11020293",
+            "14505654",
+            "17531479",
+            "18522867",
+            "9379442"
+          ],
+          "comparability_notes": [
+            "direct target binding"
+          ]
+        },
+        "pIC50": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "sd": null,
+          "sem": null,
+          "standard_values_nM": [],
+          "values": [],
+          "document_chembl_ids": [],
+          "years": [],
+          "dois": [],
+          "pubmed_ids": [],
+          "comparability_notes": []
+        }
+      },
+      "predictions": {
+        "pIC50": {
+          "target": "CHEMBL253",
+          "endpoint": "pIC50",
+          "value": 8.78,
+          "uncertainty": 1.217,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": false,
+            "out_of_domain_features": [
+              "mol_wt"
+            ],
+            "distance": 0.0042,
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "pKi": {
+          "target": "CHEMBL253",
+          "endpoint": "pKi",
+          "value": 8.608,
+          "uncertainty": 0.828,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": true,
+            "out_of_domain_features": [],
+            "distance": 0.0,
+            "warning": null
+          }
+        }
+      },
       "prediction": {
         "target": "CHEMBL253",
-        "pIC50": 6.426,
-        "uncertainty": 0.958,
-        "model_version": "demo-cpu-ridge-v1",
-        "model_kind": "cpu_descriptor_ridge",
+        "endpoint": "pIC50",
+        "value": 8.78,
+        "uncertainty": 1.217,
+        "model_version": "demo-cpu-endpoint-ridge-v1",
+        "model_kind": "cpu_descriptor_endpoint_ridge",
         "device": "cpu",
         "applicability_domain": {
           "method": "descriptor_min_max",
           "in_domain": false,
           "out_of_domain_features": [
-            "tpsa"
+            "mol_wt"
           ],
-          "distance": 0.0017,
+          "distance": 0.0042,
           "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
         }
       },
-      "prediction_minus_literature_mean": -1.254,
-      "fold_error_vs_literature_mean": 17.9473
+      "endpoint_deltas": {
+        "pIC50": {
+          "prediction_minus_literature_mean": null,
+          "fold_error_vs_literature_mean": null
+        },
+        "pKi": {
+          "prediction_minus_literature_mean": 0.928,
+          "fold_error_vs_literature_mean": 8.4723
+        }
+      },
+      "prediction_minus_literature_mean": 1.1,
+      "fold_error_vs_literature_mean": 12.5893
     },
     {
       "compound_label": "LSD",
       "compound_proxy": "Lysergide",
       "compound_chembl_id": "CHEMBL263881",
       "canonical_smiles": "CCN(CC)C(=O)[C@@H]1C=C2c3cccc4[nH]cc(c34)C[C@H]2N(C)C1",
+      "rdkit_features": {
+        "mol_wt": 323.44,
+        "logp": 2.906,
+        "tpsa": 39.34,
+        "hbd": 1.0,
+        "hba": 2.0,
+        "rotatable_bonds": 3.0,
+        "aromatic_rings": 2.0,
+        "fraction_csp3": 0.45,
+        "qed": 0.943209
+      },
       "literature_targets": [
         "CHEMBL224"
       ],
@@ -327,12 +1602,137 @@
           "functional endpoint"
         ]
       },
+      "literature_by_endpoint": {
+        "pEC50": {
+          "n": 2,
+          "mean": 7.885,
+          "median": 7.885,
+          "sd": 0.0071,
+          "sem": 0.005,
+          "standard_values_nM": [
+            12.9,
+            13.2
+          ],
+          "values": [
+            7.89,
+            7.88
+          ],
+          "document_chembl_ids": [
+            "CHEMBL5113537"
+          ],
+          "years": [
+            2022
+          ],
+          "dois": [
+            "10.1021/acs.jmedchem.2c00702"
+          ],
+          "pubmed_ids": [
+            "36099411"
+          ],
+          "comparability_notes": [
+            "functional endpoint"
+          ]
+        },
+        "pKi": {
+          "n": 5,
+          "mean": 8.492,
+          "median": 8.5,
+          "sd": 0.0698,
+          "sem": 0.0312,
+          "standard_values_nM": [
+            3.162,
+            2.6,
+            4.0,
+            3.1,
+            3.5
+          ],
+          "values": [
+            8.5,
+            8.59,
+            8.4,
+            8.51,
+            8.46
+          ],
+          "document_chembl_ids": [
+            "CHEMBL1145901",
+            "CHEMBL1150367"
+          ],
+          "years": [
+            2003,
+            2008
+          ],
+          "dois": [
+            "10.1016/j.bmc.2008.04.050",
+            "10.1021/jm0341204"
+          ],
+          "pubmed_ids": [
+            "14613313",
+            "18468904"
+          ],
+          "comparability_notes": [
+            "direct target binding"
+          ]
+        },
+        "pIC50": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "sd": null,
+          "sem": null,
+          "standard_values_nM": [],
+          "values": [],
+          "document_chembl_ids": [],
+          "years": [],
+          "dois": [],
+          "pubmed_ids": [],
+          "comparability_notes": []
+        }
+      },
+      "predictions": {
+        "pIC50": {
+          "target": "CHEMBL224",
+          "endpoint": "pIC50",
+          "value": 7.345,
+          "uncertainty": 1.218,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": false,
+            "out_of_domain_features": [
+              "qed"
+            ],
+            "distance": 0.0031,
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "pKi": {
+          "target": "CHEMBL224",
+          "endpoint": "pKi",
+          "value": 6.816,
+          "uncertainty": 0.986,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": false,
+            "out_of_domain_features": [
+              "qed"
+            ],
+            "distance": 0.0035,
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        }
+      },
       "prediction": {
         "target": "CHEMBL224",
-        "pIC50": 6.723,
-        "uncertainty": 1.2,
-        "model_version": "demo-cpu-ridge-v1",
-        "model_kind": "cpu_descriptor_ridge",
+        "endpoint": "pIC50",
+        "value": 7.345,
+        "uncertainty": 1.218,
+        "model_version": "demo-cpu-endpoint-ridge-v1",
+        "model_kind": "cpu_descriptor_endpoint_ridge",
         "device": "cpu",
         "applicability_domain": {
           "method": "descriptor_min_max",
@@ -344,14 +1744,227 @@
           "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
         }
       },
-      "prediction_minus_literature_mean": -1.5956,
-      "fold_error_vs_literature_mean": 39.4094
+      "endpoint_deltas": {
+        "pIC50": {
+          "prediction_minus_literature_mean": null,
+          "fold_error_vs_literature_mean": null
+        },
+        "pKi": {
+          "prediction_minus_literature_mean": -1.676,
+          "fold_error_vs_literature_mean": 47.4242
+        }
+      },
+      "prediction_minus_literature_mean": -0.9736,
+      "fold_error_vs_literature_mean": 9.4102
+    },
+    {
+      "compound_label": "MDMA",
+      "compound_proxy": "Midomafetamine",
+      "compound_chembl_id": "CHEMBL43048",
+      "canonical_smiles": "CNC(C)Cc1ccc2c(c1)OCO2",
+      "rdkit_features": {
+        "mol_wt": 193.246,
+        "logp": 1.5657,
+        "tpsa": 30.49,
+        "hbd": 1.0,
+        "hba": 3.0,
+        "rotatable_bonds": 3.0,
+        "aromatic_rings": 1.0,
+        "fraction_csp3": 0.454545,
+        "qed": 0.789956
+      },
+      "literature_targets": [
+        "CHEMBL238"
+      ],
+      "model_target": "CHEMBL238",
+      "target_label": "DAT",
+      "literature": {
+        "n": 3,
+        "mean_pX": 5.8367,
+        "median_pX": 5.84,
+        "sd_pX": 0.215,
+        "sem_pX": 0.1241,
+        "endpoint_types": [
+          "IC50",
+          "Ki"
+        ],
+        "standard_values_nM": [
+          1442.0,
+          897.0,
+          2398.83
+        ],
+        "pX_values": [
+          5.84,
+          6.05,
+          5.62
+        ],
+        "document_chembl_ids": [
+          "CHEMBL1154253",
+          "CHEMBL2390840"
+        ],
+        "years": [
+          2009,
+          2013
+        ],
+        "dois": [
+          "10.1016/j.bmcl.2013.03.066",
+          "10.1016/j.ejmech.2009.07.027"
+        ],
+        "pubmed_ids": [
+          "19717215",
+          "23602445"
+        ],
+        "comparability_notes": [
+          "direct target binding",
+          "direct target functional"
+        ]
+      },
+      "literature_by_endpoint": {
+        "pIC50": {
+          "n": 2,
+          "mean": 5.73,
+          "median": 5.73,
+          "sd": 0.1556,
+          "sem": 0.11,
+          "standard_values_nM": [
+            1442.0,
+            2398.83
+          ],
+          "values": [
+            5.84,
+            5.62
+          ],
+          "document_chembl_ids": [
+            "CHEMBL1154253",
+            "CHEMBL2390840"
+          ],
+          "years": [
+            2009,
+            2013
+          ],
+          "dois": [
+            "10.1016/j.bmcl.2013.03.066",
+            "10.1016/j.ejmech.2009.07.027"
+          ],
+          "pubmed_ids": [
+            "19717215",
+            "23602445"
+          ],
+          "comparability_notes": [
+            "direct target functional"
+          ]
+        },
+        "pKi": {
+          "n": 1,
+          "mean": 6.05,
+          "median": 6.05,
+          "sd": 0.0,
+          "sem": 0.0,
+          "standard_values_nM": [
+            897.0
+          ],
+          "values": [
+            6.05
+          ],
+          "document_chembl_ids": [
+            "CHEMBL2390840"
+          ],
+          "years": [
+            2013
+          ],
+          "dois": [
+            "10.1016/j.bmcl.2013.03.066"
+          ],
+          "pubmed_ids": [
+            "23602445"
+          ],
+          "comparability_notes": [
+            "direct target binding"
+          ]
+        }
+      },
+      "predictions": {
+        "pIC50": {
+          "target": "CHEMBL238",
+          "endpoint": "pIC50",
+          "value": 7.53,
+          "uncertainty": 1.034,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": true,
+            "out_of_domain_features": [],
+            "distance": 0.0,
+            "warning": null
+          }
+        },
+        "pKi": {
+          "target": "CHEMBL238",
+          "endpoint": "pKi",
+          "value": 6.73,
+          "uncertainty": 1.114,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": false,
+            "out_of_domain_features": [
+              "mol_wt",
+              "logp"
+            ],
+            "distance": 0.0189,
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        }
+      },
+      "prediction": {
+        "target": "CHEMBL238",
+        "endpoint": "pIC50",
+        "value": 7.53,
+        "uncertainty": 1.034,
+        "model_version": "demo-cpu-endpoint-ridge-v1",
+        "model_kind": "cpu_descriptor_endpoint_ridge",
+        "device": "cpu",
+        "applicability_domain": {
+          "method": "descriptor_min_max",
+          "in_domain": true,
+          "out_of_domain_features": [],
+          "distance": 0.0,
+          "warning": null
+        }
+      },
+      "endpoint_deltas": {
+        "pIC50": {
+          "prediction_minus_literature_mean": 1.8,
+          "fold_error_vs_literature_mean": 63.0957
+        },
+        "pKi": {
+          "prediction_minus_literature_mean": 0.68,
+          "fold_error_vs_literature_mean": 4.7863
+        }
+      },
+      "prediction_minus_literature_mean": 1.6933,
+      "fold_error_vs_literature_mean": 49.3515
     },
     {
       "compound_label": "Methylphenidate",
       "compound_proxy": "Methylphenidate",
       "compound_chembl_id": "CHEMBL796",
       "canonical_smiles": "COC(=O)C(c1ccccc1)C1CCCCN1",
+      "rdkit_features": {
+        "mol_wt": 233.311,
+        "logp": 2.0853,
+        "tpsa": 38.33,
+        "hbd": 1.0,
+        "hba": 3.0,
+        "rotatable_bonds": 3.0,
+        "aromatic_rings": 1.0,
+        "fraction_csp3": 0.5,
+        "qed": 0.81234
+      },
       "literature_targets": [
         "CHEMBL238"
       ],
@@ -404,12 +2017,119 @@
           "direct target functional"
         ]
       },
+      "literature_by_endpoint": {
+        "pIC50": {
+          "n": 2,
+          "mean": 7.435,
+          "median": 7.435,
+          "sd": 0.4738,
+          "sem": 0.335,
+          "standard_values_nM": [
+            17.0,
+            79.0
+          ],
+          "values": [
+            7.77,
+            7.1
+          ],
+          "document_chembl_ids": [
+            "CHEMBL1136769",
+            "CHEMBL1139231"
+          ],
+          "years": [
+            2006,
+            2007
+          ],
+          "dois": [
+            "10.1021/jm0608614"
+          ],
+          "pubmed_ids": [
+            "16913708",
+            "17228864"
+          ],
+          "comparability_notes": [
+            "cross-species but same transporter family",
+            "direct target functional"
+          ]
+        },
+        "pKi": {
+          "n": 2,
+          "mean": 7.215,
+          "median": 7.215,
+          "sd": 0.3606,
+          "sem": 0.255,
+          "standard_values_nM": [
+            110.0,
+            34.0
+          ],
+          "values": [
+            6.96,
+            7.47
+          ],
+          "document_chembl_ids": [
+            "CHEMBL1139231",
+            "CHEMBL3351632"
+          ],
+          "years": [
+            2007,
+            2014
+          ],
+          "dois": [
+            "10.1021/jm0608614",
+            "10.1021/ml500053b"
+          ],
+          "pubmed_ids": [
+            "17228864",
+            "25050161"
+          ],
+          "comparability_notes": [
+            "direct target binding"
+          ]
+        }
+      },
+      "predictions": {
+        "pIC50": {
+          "target": "CHEMBL238",
+          "endpoint": "pIC50",
+          "value": 7.242,
+          "uncertainty": 1.034,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": true,
+            "out_of_domain_features": [],
+            "distance": 0.0,
+            "warning": null
+          }
+        },
+        "pKi": {
+          "target": "CHEMBL238",
+          "endpoint": "pKi",
+          "value": 6.559,
+          "uncertainty": 1.096,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": false,
+            "out_of_domain_features": [
+              "mol_wt"
+            ],
+            "distance": 0.0032,
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        }
+      },
       "prediction": {
         "target": "CHEMBL238",
-        "pIC50": 6.154,
-        "uncertainty": 0.82,
-        "model_version": "demo-cpu-ridge-v1",
-        "model_kind": "cpu_descriptor_ridge",
+        "endpoint": "pIC50",
+        "value": 7.242,
+        "uncertainty": 1.034,
+        "model_version": "demo-cpu-endpoint-ridge-v1",
+        "model_kind": "cpu_descriptor_endpoint_ridge",
         "device": "cpu",
         "applicability_domain": {
           "method": "descriptor_min_max",
@@ -419,14 +2139,35 @@
           "warning": null
         }
       },
-      "prediction_minus_literature_mean": -1.171,
-      "fold_error_vs_literature_mean": 14.8252
+      "endpoint_deltas": {
+        "pIC50": {
+          "prediction_minus_literature_mean": -0.193,
+          "fold_error_vs_literature_mean": 1.5596
+        },
+        "pKi": {
+          "prediction_minus_literature_mean": -0.656,
+          "fold_error_vs_literature_mean": 4.529
+        }
+      },
+      "prediction_minus_literature_mean": -0.083,
+      "fold_error_vs_literature_mean": 1.2106
     },
     {
       "compound_label": "Morphine",
       "compound_proxy": "Morphine",
       "compound_chembl_id": "CHEMBL70",
       "canonical_smiles": "CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5",
+      "rdkit_features": {
+        "mol_wt": 285.343,
+        "logp": 1.1981,
+        "tpsa": 52.93,
+        "hbd": 2.0,
+        "hba": 4.0,
+        "rotatable_bonds": 0.0,
+        "aromatic_rings": 1.0,
+        "fraction_csp3": 0.529412,
+        "qed": 0.703347
+      },
       "literature_targets": [
         "CHEMBL233"
       ],
@@ -487,12 +2228,115 @@
           "direct target binding"
         ]
       },
+      "literature_by_endpoint": {
+        "pKi": {
+          "n": 5,
+          "mean": 8.63,
+          "median": 8.74,
+          "sd": 0.5324,
+          "sem": 0.2381,
+          "standard_values_nM": [
+            3.0,
+            1.8,
+            0.88,
+            17.0,
+            0.88
+          ],
+          "values": [
+            8.52,
+            8.74,
+            9.06,
+            7.77,
+            9.06
+          ],
+          "document_chembl_ids": [
+            "CHEMBL1124535",
+            "CHEMBL1131022",
+            "CHEMBL1144935",
+            "CHEMBL1148605",
+            "CHEMBL1149134"
+          ],
+          "years": [
+            1989,
+            1998,
+            2003,
+            2004,
+            2006
+          ],
+          "dois": [
+            "10.1021/jm00127a036",
+            "10.1021/jm0307640",
+            "10.1021/jm049978n",
+            "10.1021/jm050577x",
+            "10.1021/jm970861r"
+          ],
+          "pubmed_ids": [
+            "12930147",
+            "15055988",
+            "16392810",
+            "2567782",
+            "9651168"
+          ],
+          "comparability_notes": [
+            "direct target binding"
+          ]
+        },
+        "pIC50": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "sd": null,
+          "sem": null,
+          "standard_values_nM": [],
+          "values": [],
+          "document_chembl_ids": [],
+          "years": [],
+          "dois": [],
+          "pubmed_ids": [],
+          "comparability_notes": []
+        }
+      },
+      "predictions": {
+        "pIC50": {
+          "target": "CHEMBL233",
+          "endpoint": "pIC50",
+          "value": 7.516,
+          "uncertainty": 1.083,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": true,
+            "out_of_domain_features": [],
+            "distance": 0.0,
+            "warning": null
+          }
+        },
+        "pKi": {
+          "target": "CHEMBL233",
+          "endpoint": "pKi",
+          "value": 7.26,
+          "uncertainty": 1.364,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": true,
+            "out_of_domain_features": [],
+            "distance": 0.0,
+            "warning": null
+          }
+        }
+      },
       "prediction": {
         "target": "CHEMBL233",
-        "pIC50": 6.395,
-        "uncertainty": 0.891,
-        "model_version": "demo-cpu-ridge-v1",
-        "model_kind": "cpu_descriptor_ridge",
+        "endpoint": "pIC50",
+        "value": 7.516,
+        "uncertainty": 1.083,
+        "model_version": "demo-cpu-endpoint-ridge-v1",
+        "model_kind": "cpu_descriptor_endpoint_ridge",
         "device": "cpu",
         "applicability_domain": {
           "method": "descriptor_min_max",
@@ -502,14 +2346,35 @@
           "warning": null
         }
       },
-      "prediction_minus_literature_mean": -2.235,
-      "fold_error_vs_literature_mean": 171.7908
+      "endpoint_deltas": {
+        "pIC50": {
+          "prediction_minus_literature_mean": null,
+          "fold_error_vs_literature_mean": null
+        },
+        "pKi": {
+          "prediction_minus_literature_mean": -1.37,
+          "fold_error_vs_literature_mean": 23.4423
+        }
+      },
+      "prediction_minus_literature_mean": -1.114,
+      "fold_error_vs_literature_mean": 13.0017
     },
     {
       "compound_label": "Morphine",
       "compound_proxy": "Morphine",
       "compound_chembl_id": "CHEMBL70",
       "canonical_smiles": "CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5",
+      "rdkit_features": {
+        "mol_wt": 285.343,
+        "logp": 1.1981,
+        "tpsa": 52.93,
+        "hbd": 2.0,
+        "hba": 4.0,
+        "rotatable_bonds": 0.0,
+        "aromatic_rings": 1.0,
+        "fraction_csp3": 0.529412,
+        "qed": 0.703347
+      },
       "literature_targets": [
         "CHEMBL236"
       ],
@@ -552,12 +2417,99 @@
           "direct target binding"
         ]
       },
+      "literature_by_endpoint": {
+        "pKi": {
+          "n": 2,
+          "mean": 6.685,
+          "median": 6.685,
+          "sd": 0.2333,
+          "sem": 0.165,
+          "standard_values_nM": [
+            299.0,
+            140.0
+          ],
+          "values": [
+            6.52,
+            6.85
+          ],
+          "document_chembl_ids": [
+            "CHEMBL1144935",
+            "CHEMBL1149134"
+          ],
+          "years": [
+            2003,
+            2004
+          ],
+          "dois": [
+            "10.1021/jm0307640",
+            "10.1021/jm049978n"
+          ],
+          "pubmed_ids": [
+            "12930147",
+            "15055988"
+          ],
+          "comparability_notes": [
+            "direct target binding"
+          ]
+        },
+        "pIC50": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "sd": null,
+          "sem": null,
+          "standard_values_nM": [],
+          "values": [],
+          "document_chembl_ids": [],
+          "years": [],
+          "dois": [],
+          "pubmed_ids": [],
+          "comparability_notes": []
+        }
+      },
+      "predictions": {
+        "pIC50": {
+          "target": "CHEMBL236",
+          "endpoint": "pIC50",
+          "value": 7.551,
+          "uncertainty": 1.264,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": true,
+            "out_of_domain_features": [],
+            "distance": 0.0,
+            "warning": null
+          }
+        },
+        "pKi": {
+          "target": "CHEMBL236",
+          "endpoint": "pKi",
+          "value": 6.963,
+          "uncertainty": 1.808,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": false,
+            "out_of_domain_features": [
+              "mol_wt"
+            ],
+            "distance": 0.0019,
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        }
+      },
       "prediction": {
         "target": "CHEMBL236",
-        "pIC50": 6.167,
-        "uncertainty": 1.241,
-        "model_version": "demo-cpu-ridge-v1",
-        "model_kind": "cpu_descriptor_ridge",
+        "endpoint": "pIC50",
+        "value": 7.551,
+        "uncertainty": 1.264,
+        "model_version": "demo-cpu-endpoint-ridge-v1",
+        "model_kind": "cpu_descriptor_endpoint_ridge",
         "device": "cpu",
         "applicability_domain": {
           "method": "descriptor_min_max",
@@ -567,14 +2519,394 @@
           "warning": null
         }
       },
-      "prediction_minus_literature_mean": -0.518,
-      "fold_error_vs_literature_mean": 3.2961
+      "endpoint_deltas": {
+        "pIC50": {
+          "prediction_minus_literature_mean": null,
+          "fold_error_vs_literature_mean": null
+        },
+        "pKi": {
+          "prediction_minus_literature_mean": 0.278,
+          "fold_error_vs_literature_mean": 1.8967
+        }
+      },
+      "prediction_minus_literature_mean": 0.866,
+      "fold_error_vs_literature_mean": 7.3451
+    },
+    {
+      "compound_label": "Tramadol",
+      "compound_proxy": "Tramadol",
+      "compound_chembl_id": "CHEMBL1237044",
+      "canonical_smiles": "COc1cccc(C2(O)CCCCC2CN(C)C)c1",
+      "rdkit_features": {
+        "mol_wt": 263.381,
+        "logp": 2.6346,
+        "tpsa": 32.7,
+        "hbd": 1.0,
+        "hba": 3.0,
+        "rotatable_bonds": 4.0,
+        "aromatic_rings": 1.0,
+        "fraction_csp3": 0.625,
+        "qed": 0.906176
+      },
+      "literature_targets": [
+        "CHEMBL233"
+      ],
+      "model_target": "CHEMBL233",
+      "target_label": "mu-opioid",
+      "literature": {
+        "n": 3,
+        "mean_pX": 5.54,
+        "median_pX": 5.7,
+        "sd_pX": 0.3672,
+        "sem_pX": 0.212,
+        "endpoint_types": [
+          "IC50",
+          "Ki"
+        ],
+        "standard_values_nM": [
+          2000.0,
+          1600.0,
+          7600.0
+        ],
+        "pX_values": [
+          5.7,
+          5.8,
+          5.12
+        ],
+        "document_chembl_ids": [
+          "CHEMBL1132713",
+          "CHEMBL1139291",
+          "CHEMBL1149431"
+        ],
+        "years": [
+          1999,
+          2006,
+          2009
+        ],
+        "dois": [
+          "10.1016/j.bmcl.2005.10.024",
+          "10.1016/j.bmcl.2008.10.134",
+          "10.1021/jm9805034"
+        ],
+        "pubmed_ids": [
+          "10229619",
+          "16257206",
+          "19027293"
+        ],
+        "comparability_notes": [
+          "direct target binding",
+          "direct target functional"
+        ]
+      },
+      "literature_by_endpoint": {
+        "pIC50": {
+          "n": 1,
+          "mean": 5.12,
+          "median": 5.12,
+          "sd": 0.0,
+          "sem": 0.0,
+          "standard_values_nM": [
+            7600.0
+          ],
+          "values": [
+            5.12
+          ],
+          "document_chembl_ids": [
+            "CHEMBL1149431"
+          ],
+          "years": [
+            2006
+          ],
+          "dois": [
+            "10.1016/j.bmcl.2005.10.024"
+          ],
+          "pubmed_ids": [
+            "16257206"
+          ],
+          "comparability_notes": [
+            "direct target functional"
+          ]
+        },
+        "pKi": {
+          "n": 2,
+          "mean": 5.75,
+          "median": 5.75,
+          "sd": 0.0707,
+          "sem": 0.05,
+          "standard_values_nM": [
+            2000.0,
+            1600.0
+          ],
+          "values": [
+            5.7,
+            5.8
+          ],
+          "document_chembl_ids": [
+            "CHEMBL1132713",
+            "CHEMBL1139291"
+          ],
+          "years": [
+            1999,
+            2009
+          ],
+          "dois": [
+            "10.1016/j.bmcl.2008.10.134",
+            "10.1021/jm9805034"
+          ],
+          "pubmed_ids": [
+            "10229619",
+            "19027293"
+          ],
+          "comparability_notes": [
+            "direct target binding"
+          ]
+        }
+      },
+      "predictions": {
+        "pIC50": {
+          "target": "CHEMBL233",
+          "endpoint": "pIC50",
+          "value": 6.891,
+          "uncertainty": 1.083,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": true,
+            "out_of_domain_features": [],
+            "distance": 0.0,
+            "warning": null
+          }
+        },
+        "pKi": {
+          "target": "CHEMBL233",
+          "endpoint": "pKi",
+          "value": 7.166,
+          "uncertainty": 1.364,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": true,
+            "out_of_domain_features": [],
+            "distance": 0.0,
+            "warning": null
+          }
+        }
+      },
+      "prediction": {
+        "target": "CHEMBL233",
+        "endpoint": "pIC50",
+        "value": 6.891,
+        "uncertainty": 1.083,
+        "model_version": "demo-cpu-endpoint-ridge-v1",
+        "model_kind": "cpu_descriptor_endpoint_ridge",
+        "device": "cpu",
+        "applicability_domain": {
+          "method": "descriptor_min_max",
+          "in_domain": true,
+          "out_of_domain_features": [],
+          "distance": 0.0,
+          "warning": null
+        }
+      },
+      "endpoint_deltas": {
+        "pIC50": {
+          "prediction_minus_literature_mean": 1.771,
+          "fold_error_vs_literature_mean": 59.0201
+        },
+        "pKi": {
+          "prediction_minus_literature_mean": 1.416,
+          "fold_error_vs_literature_mean": 26.0615
+        }
+      },
+      "prediction_minus_literature_mean": 1.351,
+      "fold_error_vs_literature_mean": 22.4388
+    },
+    {
+      "compound_label": "Tramadol",
+      "compound_proxy": "Tramadol",
+      "compound_chembl_id": "CHEMBL1237044",
+      "canonical_smiles": "COc1cccc(C2(O)CCCCC2CN(C)C)c1",
+      "rdkit_features": {
+        "mol_wt": 263.381,
+        "logp": 2.6346,
+        "tpsa": 32.7,
+        "hbd": 1.0,
+        "hba": 3.0,
+        "rotatable_bonds": 4.0,
+        "aromatic_rings": 1.0,
+        "fraction_csp3": 0.625,
+        "qed": 0.906176
+      },
+      "literature_targets": [
+        "CHEMBL236"
+      ],
+      "model_target": "CHEMBL236",
+      "target_label": "delta-opioid",
+      "literature": {
+        "n": 1,
+        "mean_pX": 8.03,
+        "median_pX": 8.03,
+        "sd_pX": 0.0,
+        "sem_pX": 0.0,
+        "endpoint_types": [
+          "Ki"
+        ],
+        "standard_values_nM": [
+          9.4
+        ],
+        "pX_values": [
+          8.03
+        ],
+        "document_chembl_ids": [
+          "CHEMBL1139291"
+        ],
+        "years": [
+          2009
+        ],
+        "dois": [
+          "10.1016/j.bmcl.2008.10.134"
+        ],
+        "pubmed_ids": [
+          "19027293"
+        ],
+        "comparability_notes": [
+          "direct target binding"
+        ]
+      },
+      "literature_by_endpoint": {
+        "pKi": {
+          "n": 1,
+          "mean": 8.03,
+          "median": 8.03,
+          "sd": 0.0,
+          "sem": 0.0,
+          "standard_values_nM": [
+            9.4
+          ],
+          "values": [
+            8.03
+          ],
+          "document_chembl_ids": [
+            "CHEMBL1139291"
+          ],
+          "years": [
+            2009
+          ],
+          "dois": [
+            "10.1016/j.bmcl.2008.10.134"
+          ],
+          "pubmed_ids": [
+            "19027293"
+          ],
+          "comparability_notes": [
+            "direct target binding"
+          ]
+        },
+        "pIC50": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "sd": null,
+          "sem": null,
+          "standard_values_nM": [],
+          "values": [],
+          "document_chembl_ids": [],
+          "years": [],
+          "dois": [],
+          "pubmed_ids": [],
+          "comparability_notes": []
+        }
+      },
+      "predictions": {
+        "pIC50": {
+          "target": "CHEMBL236",
+          "endpoint": "pIC50",
+          "value": 7.636,
+          "uncertainty": 1.264,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": false,
+            "out_of_domain_features": [
+              "qed"
+            ],
+            "distance": 0.0001,
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "pKi": {
+          "target": "CHEMBL236",
+          "endpoint": "pKi",
+          "value": 7.69,
+          "uncertainty": 1.818,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": false,
+            "out_of_domain_features": [
+              "mol_wt",
+              "qed"
+            ],
+            "distance": 0.0075,
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        }
+      },
+      "prediction": {
+        "target": "CHEMBL236",
+        "endpoint": "pIC50",
+        "value": 7.636,
+        "uncertainty": 1.264,
+        "model_version": "demo-cpu-endpoint-ridge-v1",
+        "model_kind": "cpu_descriptor_endpoint_ridge",
+        "device": "cpu",
+        "applicability_domain": {
+          "method": "descriptor_min_max",
+          "in_domain": false,
+          "out_of_domain_features": [
+            "qed"
+          ],
+          "distance": 0.0001,
+          "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+        }
+      },
+      "endpoint_deltas": {
+        "pIC50": {
+          "prediction_minus_literature_mean": null,
+          "fold_error_vs_literature_mean": null
+        },
+        "pKi": {
+          "prediction_minus_literature_mean": -0.34,
+          "fold_error_vs_literature_mean": 2.1878
+        }
+      },
+      "prediction_minus_literature_mean": -0.394,
+      "fold_error_vs_literature_mean": 2.4774
     },
     {
       "compound_label": "bkMDMA",
       "compound_proxy": "Methylone",
       "compound_chembl_id": "CHEMBL3604010",
       "canonical_smiles": "CNC(C)C(=O)c1ccc2c(c1)OCO2",
+      "rdkit_features": {
+        "mol_wt": 207.229,
+        "logp": 1.2059,
+        "tpsa": 47.56,
+        "hbd": 1.0,
+        "hba": 4.0,
+        "rotatable_bonds": 3.0,
+        "aromatic_rings": 1.0,
+        "fraction_csp3": 0.363636,
+        "qed": 0.756596
+      },
       "literature_targets": [
         "CHEMBL338"
       ],
@@ -611,12 +2943,108 @@
           "cross-species proxy compared with human DAT model"
         ]
       },
+      "literature_by_endpoint": {
+        "pEC50": {
+          "n": 1,
+          "mean": 6.88,
+          "median": 6.88,
+          "sd": 0.0,
+          "sem": 0.0,
+          "standard_values_nM": [
+            133.0
+          ],
+          "values": [
+            6.88
+          ],
+          "document_chembl_ids": [
+            "CHEMBL3603823"
+          ],
+          "years": [
+            2015
+          ],
+          "dois": [
+            "10.1016/j.bmc.2015.07.035"
+          ],
+          "pubmed_ids": [
+            "26233799"
+          ],
+          "comparability_notes": [
+            "cross-species proxy compared with human DAT model"
+          ]
+        },
+        "pIC50": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "sd": null,
+          "sem": null,
+          "standard_values_nM": [],
+          "values": [],
+          "document_chembl_ids": [],
+          "years": [],
+          "dois": [],
+          "pubmed_ids": [],
+          "comparability_notes": []
+        },
+        "pKi": {
+          "n": 0,
+          "mean": null,
+          "median": null,
+          "sd": null,
+          "sem": null,
+          "standard_values_nM": [],
+          "values": [],
+          "document_chembl_ids": [],
+          "years": [],
+          "dois": [],
+          "pubmed_ids": [],
+          "comparability_notes": []
+        }
+      },
+      "predictions": {
+        "pIC50": {
+          "target": "CHEMBL238",
+          "endpoint": "pIC50",
+          "value": 6.879,
+          "uncertainty": 1.034,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": true,
+            "out_of_domain_features": [],
+            "distance": 0.0,
+            "warning": null
+          }
+        },
+        "pKi": {
+          "target": "CHEMBL238",
+          "endpoint": "pKi",
+          "value": 6.683,
+          "uncertainty": 1.117,
+          "model_version": "demo-cpu-endpoint-ridge-v1",
+          "model_kind": "cpu_descriptor_endpoint_ridge",
+          "device": "cpu",
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "in_domain": false,
+            "out_of_domain_features": [
+              "mol_wt",
+              "logp"
+            ],
+            "distance": 0.0222,
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        }
+      },
       "prediction": {
         "target": "CHEMBL238",
-        "pIC50": 5.664,
-        "uncertainty": 0.82,
-        "model_version": "demo-cpu-ridge-v1",
-        "model_kind": "cpu_descriptor_ridge",
+        "endpoint": "pIC50",
+        "value": 6.879,
+        "uncertainty": 1.034,
+        "model_version": "demo-cpu-endpoint-ridge-v1",
+        "model_kind": "cpu_descriptor_endpoint_ridge",
         "device": "cpu",
         "applicability_domain": {
           "method": "descriptor_min_max",
@@ -626,8 +3054,18 @@
           "warning": null
         }
       },
-      "prediction_minus_literature_mean": -1.216,
-      "fold_error_vs_literature_mean": 16.4437
+      "endpoint_deltas": {
+        "pIC50": {
+          "prediction_minus_literature_mean": null,
+          "fold_error_vs_literature_mean": null
+        },
+        "pKi": {
+          "prediction_minus_literature_mean": null,
+          "fold_error_vs_literature_mean": null
+        }
+      },
+      "prediction_minus_literature_mean": -0.001,
+      "fold_error_vs_literature_mean": 1.0023
     }
   ]
 }

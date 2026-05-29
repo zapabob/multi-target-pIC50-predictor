@@ -1,0 +1,844 @@
+{
+  "model_version": "demo-cpu-endpoint-ridge-v1",
+  "model_kind": "cpu_descriptor_endpoint_ridge",
+  "device": "cpu",
+  "context_of_use": {
+    "intended_use": "CPU-only early discovery demo for small-molecule pIC50 and pKi triage.",
+    "decision_role": "research_triage_only",
+    "not_for": [
+      "clinical_decision",
+      "regulatory_submission",
+      "manufacturing_release",
+      "patient_care"
+    ],
+    "endpoint": "Target-specific pIC50 and pKi derived from IC50 or Ki nM values. Endpoint families are modeled separately and should not be pooled for scientific claims without assay-level governance."
+  },
+  "benchmark_dataset": {
+    "path": "data/chembl_endpoint_activity_snapshot.csv",
+    "source": "ChEMBL",
+    "rows": 2103,
+    "splits": [
+      "external",
+      "scaffold_test",
+      "train"
+    ],
+    "endpoints": [
+      "pIC50",
+      "pKi"
+    ]
+  },
+  "endpoints": {
+    "pIC50": {
+      "targets": {
+        "CHEMBL218": {
+          "target_name": "CB1",
+          "n_train": 157,
+          "metrics": {
+            "external": {
+              "r2": 0.4064,
+              "rmse": 0.4242,
+              "mae": 0.3325,
+              "n": 13
+            },
+            "scaffold_test": {
+              "r2": 0.3335,
+              "rmse": 0.8558,
+              "mae": 0.7528,
+              "n": 24
+            },
+            "train": {
+              "r2": 0.4368,
+              "rmse": 0.7235,
+              "mae": 0.5568,
+              "n": 157
+            }
+          },
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "training_split": "train",
+            "features": {
+              "mol_wt": {
+                "min": 351.40900000000005,
+                "max": 584.8870000000002
+              },
+              "logp": {
+                "min": 3.884800000000003,
+                "max": 8.845279999999999
+              },
+              "tpsa": {
+                "min": 25.240000000000002,
+                "max": 101.29
+              },
+              "hbd": {
+                "min": 0.0,
+                "max": 3.0
+              },
+              "hba": {
+                "min": 1.0,
+                "max": 6.0
+              },
+              "rotatable_bonds": {
+                "min": 3.0,
+                "max": 10.0
+              },
+              "aromatic_rings": {
+                "min": 1.0,
+                "max": 4.0
+              },
+              "fraction_csp3": {
+                "min": 0.0,
+                "max": 0.75
+              },
+              "qed": {
+                "min": 0.23505355160465624,
+                "max": 0.7679896358042831
+              }
+            },
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "CHEMBL224": {
+          "target_name": "5HT2A",
+          "n_train": 169,
+          "metrics": {
+            "external": {
+              "r2": 0.1282,
+              "rmse": 1.1508,
+              "mae": 0.8888,
+              "n": 13
+            },
+            "scaffold_test": {
+              "r2": 0.2938,
+              "rmse": 1.2142,
+              "mae": 1.0326,
+              "n": 12
+            },
+            "train": {
+              "r2": 0.2345,
+              "rmse": 0.917,
+              "mae": 0.7138,
+              "n": 169
+            }
+          },
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "training_split": "train",
+            "features": {
+              "mol_wt": {
+                "min": 212.296,
+                "max": 573.669
+              },
+              "logp": {
+                "min": 1.3211999999999997,
+                "max": 6.181880000000007
+              },
+              "tpsa": {
+                "min": 6.48,
+                "max": 94.64
+              },
+              "hbd": {
+                "min": 0.0,
+                "max": 3.0
+              },
+              "hba": {
+                "min": 2.0,
+                "max": 7.0
+              },
+              "rotatable_bonds": {
+                "min": 0.0,
+                "max": 12.0
+              },
+              "aromatic_rings": {
+                "min": 1.0,
+                "max": 4.0
+              },
+              "fraction_csp3": {
+                "min": 0.1,
+                "max": 0.7391304347826086
+              },
+              "qed": {
+                "min": 0.2884647953702993,
+                "max": 0.9152632812574281
+              }
+            },
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "CHEMBL233": {
+          "target_name": "\u03bc-opioid",
+          "n_train": 147,
+          "metrics": {
+            "external": {
+              "r2": -0.1845,
+              "rmse": 1.0193,
+              "mae": 0.7956,
+              "n": 21
+            },
+            "scaffold_test": {
+              "r2": 0.2784,
+              "rmse": 1.0827,
+              "mae": 0.8789,
+              "n": 22
+            },
+            "train": {
+              "r2": 0.2607,
+              "rmse": 1.1076,
+              "mae": 0.8396,
+              "n": 147
+            }
+          },
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "training_split": "train",
+            "features": {
+              "mol_wt": {
+                "min": 233.31099999999995,
+                "max": 1904.2130000000009
+              },
+              "logp": {
+                "min": -8.072999999999931,
+                "max": 11.035399999999992
+              },
+              "tpsa": {
+                "min": 3.24,
+                "max": 859.6999999999999
+              },
+              "hbd": {
+                "min": 0.0,
+                "max": 29.0
+              },
+              "hba": {
+                "min": 1.0,
+                "max": 26.0
+              },
+              "rotatable_bonds": {
+                "min": 0.0,
+                "max": 62.0
+              },
+              "aromatic_rings": {
+                "min": 1.0,
+                "max": 4.0
+              },
+              "fraction_csp3": {
+                "min": 0.2,
+                "max": 0.7931034482758621
+              },
+              "qed": {
+                "min": 0.014176225503769317,
+                "max": 0.9359723691309104
+              }
+            },
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "CHEMBL236": {
+          "target_name": "\u03b4-opioid",
+          "n_train": 144,
+          "metrics": {
+            "external": {
+              "r2": 0.0536,
+              "rmse": 1.2991,
+              "mae": 1.0676,
+              "n": 21
+            },
+            "scaffold_test": {
+              "r2": 0.3506,
+              "rmse": 1.2635,
+              "mae": 1.1673,
+              "n": 14
+            },
+            "train": {
+              "r2": 0.1597,
+              "rmse": 1.1119,
+              "mae": 0.9516,
+              "n": 144
+            }
+          },
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "training_split": "train",
+            "features": {
+              "mol_wt": {
+                "min": 257.377,
+                "max": 1603.9040000000005
+              },
+              "logp": {
+                "min": -5.506999999999996,
+                "max": 7.7540000000000076
+              },
+              "tpsa": {
+                "min": 3.24,
+                "max": 632.35
+              },
+              "hbd": {
+                "min": 0.0,
+                "max": 22.0
+              },
+              "hba": {
+                "min": 1.0,
+                "max": 18.0
+              },
+              "rotatable_bonds": {
+                "min": 0.0,
+                "max": 46.0
+              },
+              "aromatic_rings": {
+                "min": 1.0,
+                "max": 7.0
+              },
+              "fraction_csp3": {
+                "min": 0.2,
+                "max": 0.78125
+              },
+              "qed": {
+                "min": 0.011496651092263594,
+                "max": 0.9049321702979037
+              }
+            },
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "CHEMBL238": {
+          "target_name": "DAT",
+          "n_train": 100,
+          "metrics": {
+            "external": {
+              "r2": 0.0796,
+              "rmse": 0.9879,
+              "mae": 0.8223,
+              "n": 20
+            },
+            "scaffold_test": {
+              "r2": -0.3838,
+              "rmse": 1.0344,
+              "mae": 0.8205,
+              "n": 10
+            },
+            "train": {
+              "r2": 0.2465,
+              "rmse": 0.9248,
+              "mae": 0.7512,
+              "n": 100
+            }
+          },
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "training_split": "train",
+            "features": {
+              "mol_wt": {
+                "min": 153.18099999999998,
+                "max": 631.5010000000002
+              },
+              "logp": {
+                "min": 0.5989999999999998,
+                "max": 7.587800000000007
+              },
+              "tpsa": {
+                "min": 3.24,
+                "max": 96.38000000000001
+              },
+              "hbd": {
+                "min": 0.0,
+                "max": 3.0
+              },
+              "hba": {
+                "min": 1.0,
+                "max": 8.0
+              },
+              "rotatable_bonds": {
+                "min": 1.0,
+                "max": 15.0
+              },
+              "aromatic_rings": {
+                "min": 1.0,
+                "max": 4.0
+              },
+              "fraction_csp3": {
+                "min": 0.05,
+                "max": 0.625
+              },
+              "qed": {
+                "min": 0.14121773388210418,
+                "max": 0.9265445677693732
+              }
+            },
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "CHEMBL253": {
+          "target_name": "CB2",
+          "n_train": 148,
+          "metrics": {
+            "external": {
+              "r2": -0.0165,
+              "rmse": 0.6824,
+              "mae": 0.5605,
+              "n": 29
+            },
+            "scaffold_test": {
+              "r2": -0.109,
+              "rmse": 1.2118,
+              "mae": 0.9465,
+              "n": 17
+            },
+            "train": {
+              "r2": 0.5811,
+              "rmse": 0.675,
+              "mae": 0.5154,
+              "n": 148
+            }
+          },
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "training_split": "train",
+            "features": {
+              "mol_wt": {
+                "min": 324.471,
+                "max": 590.8940000000002
+              },
+              "logp": {
+                "min": 2.982120000000002,
+                "max": 9.346579999999994
+              },
+              "tpsa": {
+                "min": 15.6,
+                "max": 121.14000000000001
+              },
+              "hbd": {
+                "min": 0.0,
+                "max": 4.0
+              },
+              "hba": {
+                "min": 1.0,
+                "max": 7.0
+              },
+              "rotatable_bonds": {
+                "min": 2.0,
+                "max": 11.0
+              },
+              "aromatic_rings": {
+                "min": 1.0,
+                "max": 5.0
+              },
+              "fraction_csp3": {
+                "min": 0.0,
+                "max": 0.75
+              },
+              "qed": {
+                "min": 0.20388498809885228,
+                "max": 0.8525301668039665
+              }
+            },
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        }
+      }
+    },
+    "pKi": {
+      "targets": {
+        "CHEMBL218": {
+          "target_name": "CB1",
+          "n_train": 117,
+          "metrics": {
+            "external": {
+              "r2": -0.4526,
+              "rmse": 1.0583,
+              "mae": 0.8423,
+              "n": 22
+            },
+            "scaffold_test": {
+              "r2": 0.3322,
+              "rmse": 0.9891,
+              "mae": 0.8581,
+              "n": 15
+            },
+            "train": {
+              "r2": 0.4965,
+              "rmse": 0.7778,
+              "mae": 0.6124,
+              "n": 117
+            }
+          },
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "training_split": "train",
+            "features": {
+              "mol_wt": {
+                "min": 291.394,
+                "max": 580.8250000000002
+              },
+              "logp": {
+                "min": 2.804620000000001,
+                "max": 8.786600000000002
+              },
+              "tpsa": {
+                "min": 9.23,
+                "max": 118.71999999999998
+              },
+              "hbd": {
+                "min": 0.0,
+                "max": 3.0
+              },
+              "hba": {
+                "min": 1.0,
+                "max": 6.0
+              },
+              "rotatable_bonds": {
+                "min": 2.0,
+                "max": 18.0
+              },
+              "aromatic_rings": {
+                "min": 0.0,
+                "max": 4.0
+              },
+              "fraction_csp3": {
+                "min": 0.045454545454545456,
+                "max": 0.76
+              },
+              "qed": {
+                "min": 0.2102949812537246,
+                "max": 0.7985480625933138
+              }
+            },
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "CHEMBL224": {
+          "target_name": "5HT2A",
+          "n_train": 120,
+          "metrics": {
+            "external": {
+              "r2": -0.598,
+              "rmse": 1.0443,
+              "mae": 0.8485,
+              "n": 27
+            },
+            "scaffold_test": {
+              "r2": 0.2592,
+              "rmse": 0.9822,
+              "mae": 0.874,
+              "n": 17
+            },
+            "train": {
+              "r2": 0.3798,
+              "rmse": 0.8168,
+              "mae": 0.6404,
+              "n": 120
+            }
+          },
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "training_split": "train",
+            "features": {
+              "mol_wt": {
+                "min": 195.265,
+                "max": 520.6330000000004
+              },
+              "logp": {
+                "min": 1.3312,
+                "max": 6.644600000000007
+              },
+              "tpsa": {
+                "min": 0.0,
+                "max": 92.52
+              },
+              "hbd": {
+                "min": 0.0,
+                "max": 2.0
+              },
+              "hba": {
+                "min": 0.0,
+                "max": 7.0
+              },
+              "rotatable_bonds": {
+                "min": 0.0,
+                "max": 10.0
+              },
+              "aromatic_rings": {
+                "min": 1.0,
+                "max": 4.0
+              },
+              "fraction_csp3": {
+                "min": 0.06666666666666667,
+                "max": 0.5714285714285714
+              },
+              "qed": {
+                "min": 0.32208314028770735,
+                "max": 0.9118289858182123
+              }
+            },
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "CHEMBL233": {
+          "target_name": "\u03bc-opioid",
+          "n_train": 157,
+          "metrics": {
+            "external": {
+              "r2": -0.1398,
+              "rmse": 1.2508,
+              "mae": 0.9072,
+              "n": 10
+            },
+            "scaffold_test": {
+              "r2": -0.0086,
+              "rmse": 1.3639,
+              "mae": 1.1831,
+              "n": 30
+            },
+            "train": {
+              "r2": 0.2987,
+              "rmse": 1.0696,
+              "mae": 0.8541,
+              "n": 157
+            }
+          },
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "training_split": "train",
+            "features": {
+              "mol_wt": {
+                "min": 217.31199999999995,
+                "max": 1603.986000000001
+              },
+              "logp": {
+                "min": -6.128699999999953,
+                "max": 7.610300000000008
+              },
+              "tpsa": {
+                "min": 23.47,
+                "max": 669.1999999999999
+              },
+              "hbd": {
+                "min": 0.0,
+                "max": 22.0
+              },
+              "hba": {
+                "min": 2.0,
+                "max": 20.0
+              },
+              "rotatable_bonds": {
+                "min": 0.0,
+                "max": 54.0
+              },
+              "aromatic_rings": {
+                "min": 0.0,
+                "max": 4.0
+              },
+              "fraction_csp3": {
+                "min": 0.1724137931034483,
+                "max": 0.9565217391304348
+              },
+              "qed": {
+                "min": 0.016666696019140576,
+                "max": 0.9070828029685795
+              }
+            },
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "CHEMBL236": {
+          "target_name": "\u03b4-opioid",
+          "n_train": 130,
+          "metrics": {
+            "external": {
+              "r2": -0.3634,
+              "rmse": 1.7561,
+              "mae": 1.4278,
+              "n": 36
+            },
+            "scaffold_test": {
+              "r2": -1.6863,
+              "rmse": 1.8044,
+              "mae": 1.4571,
+              "n": 21
+            },
+            "train": {
+              "r2": 0.3186,
+              "rmse": 1.176,
+              "mae": 0.9669,
+              "n": 130
+            }
+          },
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "training_split": "train",
+            "features": {
+              "mol_wt": {
+                "min": 307.4370000000001,
+                "max": 1603.986000000001
+              },
+              "logp": {
+                "min": -6.128699999999953,
+                "max": 7.610300000000008
+              },
+              "tpsa": {
+                "min": 23.47,
+                "max": 669.1999999999999
+              },
+              "hbd": {
+                "min": 1.0,
+                "max": 22.0
+              },
+              "hba": {
+                "min": 2.0,
+                "max": 20.0
+              },
+              "rotatable_bonds": {
+                "min": 0.0,
+                "max": 54.0
+              },
+              "aromatic_rings": {
+                "min": 0.0,
+                "max": 4.0
+              },
+              "fraction_csp3": {
+                "min": 0.1724137931034483,
+                "max": 0.9523809523809523
+              },
+              "qed": {
+                "min": 0.016666696019140576,
+                "max": 0.872969630983074
+              }
+            },
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "CHEMBL238": {
+          "target_name": "DAT",
+          "n_train": 109,
+          "metrics": {
+            "external": {
+              "r2": 0.3718,
+              "rmse": 1.0212,
+              "mae": 0.8039,
+              "n": 16
+            },
+            "scaffold_test": {
+              "r2": 0.0559,
+              "rmse": 1.0929,
+              "mae": 0.7921,
+              "n": 12
+            },
+            "train": {
+              "r2": 0.1393,
+              "rmse": 1.0753,
+              "mae": 0.8727,
+              "n": 109
+            }
+          },
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "training_split": "train",
+            "features": {
+              "mol_wt": {
+                "min": 245.325,
+                "max": 667.766
+              },
+              "logp": {
+                "min": 1.8370999999999997,
+                "max": 7.587800000000007
+              },
+              "tpsa": {
+                "min": 3.24,
+                "max": 137.71
+              },
+              "hbd": {
+                "min": 0.0,
+                "max": 5.0
+              },
+              "hba": {
+                "min": 1.0,
+                "max": 9.0
+              },
+              "rotatable_bonds": {
+                "min": 1.0,
+                "max": 15.0
+              },
+              "aromatic_rings": {
+                "min": 1.0,
+                "max": 4.0
+              },
+              "fraction_csp3": {
+                "min": 0.05555555555555555,
+                "max": 0.6470588235294118
+              },
+              "qed": {
+                "min": 0.14121773388210418,
+                "max": 0.9265445677693732
+              }
+            },
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        },
+        "CHEMBL253": {
+          "target_name": "CB2",
+          "n_train": 131,
+          "metrics": {
+            "external": {
+              "r2": -0.7024,
+              "rmse": 1.076,
+              "mae": 0.8767,
+              "n": 20
+            },
+            "scaffold_test": {
+              "r2": 0.2822,
+              "rmse": 0.8283,
+              "mae": 0.6844,
+              "n": 32
+            },
+            "train": {
+              "r2": 0.5611,
+              "rmse": 0.7682,
+              "mae": 0.604,
+              "n": 131
+            }
+          },
+          "applicability_domain": {
+            "method": "descriptor_min_max",
+            "training_split": "train",
+            "features": {
+              "mol_wt": {
+                "min": 305.42100000000005,
+                "max": 538.0160000000002
+              },
+              "logp": {
+                "min": 2.3776200000000003,
+                "max": 9.105400000000003
+              },
+              "tpsa": {
+                "min": 0.0,
+                "max": 98.88
+              },
+              "hbd": {
+                "min": 0.0,
+                "max": 3.0
+              },
+              "hba": {
+                "min": 0.0,
+                "max": 7.0
+              },
+              "rotatable_bonds": {
+                "min": 2.0,
+                "max": 17.0
+              },
+              "aromatic_rings": {
+                "min": 1.0,
+                "max": 4.0
+              },
+              "fraction_csp3": {
+                "min": 0.13043478260869565,
+                "max": 0.75
+              },
+              "qed": {
+                "min": 0.16069345639584717,
+                "max": 0.7985480625933138
+              }
+            },
+            "warning": "Predictions outside the descriptor min/max envelope should be treated as low-confidence research triage only."
+          }
+        }
+      }
+    }
+  }
+}

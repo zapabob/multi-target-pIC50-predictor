@@ -44,6 +44,22 @@ CONTEXT_OF_USE = {
     ),
 }
 
+ENDPOINT_CONTEXT_OF_USE = {
+    "intended_use": "CPU-only early discovery demo for small-molecule pIC50 and pKi triage.",
+    "decision_role": "research_triage_only",
+    "not_for": [
+        "clinical_decision",
+        "regulatory_submission",
+        "manufacturing_release",
+        "patient_care",
+    ],
+    "endpoint": (
+        "Target-specific pIC50 and pKi derived from IC50 or Ki nM values. "
+        "Endpoint families are modeled separately and should not be pooled for "
+        "scientific claims without assay-level governance."
+    ),
+}
+
 
 @dataclass
 class CPUDemoPrediction:
@@ -60,6 +76,26 @@ class CPUDemoPrediction:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass
+class CPUDemoEndpointPrediction:
+    """Serializable endpoint-specific CPU baseline prediction output."""
+
+    smiles: str
+    target: str
+    endpoint: str
+    endpoint_prediction: float
+    uncertainty: float
+    applicability_domain: dict[str, Any]
+    model_version: str
+    model_kind: str
+    device: str
+
+    def to_dict(self) -> dict[str, Any]:
+        payload = asdict(self)
+        payload[f"{self.endpoint}_prediction"] = self.endpoint_prediction
+        return payload
 
 
 class CPUDemoPIC50Model:
@@ -110,6 +146,63 @@ class CPUDemoPIC50Model:
         )
 
 
+class CPUDemoEndpointModel:
+    """Descriptor Ridge model with separate pIC50 and pKi endpoint heads."""
+
+    def __init__(self, payload: dict[str, Any]):
+        self.payload = payload
+        self.model_version = str(payload["model_version"])
+        self.model_kind = str(payload["model_kind"])
+        self.device = str(payload.get("device", "cpu"))
+        self.feature_names = list(payload["feature_names"])
+        self.endpoints = payload["endpoints"]
+        self.context_of_use = payload["context_of_use"]
+
+    @classmethod
+    def from_file(cls, model_path: str | Path) -> CPUDemoEndpointModel:
+        path = Path(model_path)
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return cls(payload)
+
+    def predict(
+        self,
+        smiles: str,
+        target: str = "CHEMBL238",
+        endpoint: str = "pIC50",
+    ) -> CPUDemoEndpointPrediction:
+        if endpoint not in self.endpoints:
+            raise ValueError(f"Unsupported endpoint: {endpoint}")
+        endpoint_payload = self.endpoints[endpoint]
+        if target not in endpoint_payload["targets"]:
+            raise ValueError(f"Unsupported target for {endpoint}: {target}")
+
+        feature_map = calculate_descriptor_features(smiles)
+        features = np.array([feature_map[name] for name in self.feature_names], dtype=float)
+        target_payload = endpoint_payload["targets"][target]
+
+        mean = np.array(target_payload["scaler_mean"], dtype=float)
+        scale = np.array(target_payload["scaler_scale"], dtype=float)
+        coefficients = np.array(target_payload["coefficients"], dtype=float)
+        scaled_features = (features - mean) / scale
+        prediction = float(target_payload["intercept"] + np.dot(scaled_features, coefficients))
+
+        domain = _domain_check(feature_map, target_payload["applicability_domain"])
+        base_uncertainty = float(target_payload["residual_rmse"])
+        uncertainty = max(0.15, base_uncertainty * (1.0 + domain["distance"]))
+
+        return CPUDemoEndpointPrediction(
+            smiles=smiles,
+            target=target,
+            endpoint=endpoint,
+            endpoint_prediction=round(prediction, 3),
+            uncertainty=round(uncertainty, 3),
+            applicability_domain=domain,
+            model_version=self.model_version,
+            model_kind=self.model_kind,
+            device=self.device,
+        )
+
+
 class CPUDemoPredictorAdapter:
     """Adapter for CompoundAssessmentPipeline's legacy predictor interface."""
 
@@ -125,6 +218,26 @@ class CPUDemoPredictorAdapter:
             "applicability_domain": self.last_result.applicability_domain,
             "model_version": self.last_result.model_version,
             "model_kind": self.last_result.model_kind,
+        }
+
+
+class CPUDemoEndpointPredictorAdapter:
+    """Adapter for endpoint models where the assessment pipeline expects pIC50."""
+
+    def __init__(self, model: CPUDemoEndpointModel, target: str, endpoint: str = "pIC50"):
+        self.model = model
+        self.target = target
+        self.endpoint = endpoint
+        self.last_result: CPUDemoEndpointPrediction | None = None
+
+    def predict(self, smiles: str) -> tuple[float, dict[str, Any]]:
+        self.last_result = self.model.predict(smiles, self.target, self.endpoint)
+        return self.last_result.endpoint_prediction, {
+            "std": self.last_result.uncertainty,
+            "applicability_domain": self.last_result.applicability_domain,
+            "model_version": self.last_result.model_version,
+            "model_kind": self.last_result.model_kind,
+            "endpoint": self.last_result.endpoint,
         }
 
 
@@ -250,6 +363,128 @@ def build_demo_cpu_artifacts(
     return model_path, report_path
 
 
+def build_demo_endpoint_cpu_artifacts(
+    dataset_path: str | Path,
+    model_path: str | Path,
+    report_path: str | Path,
+    *,
+    alpha: float = 1.0,
+) -> tuple[Path, Path]:
+    """Build a CPU demo model with separate endpoint-specific regression heads."""
+    dataset_path = Path(dataset_path)
+    model_path = Path(model_path)
+    report_path = Path(report_path)
+
+    df = pd.read_csv(dataset_path)
+    if "smiles" not in df.columns and "canonical_smiles" in df.columns:
+        df = df.rename(columns={"canonical_smiles": "smiles"})
+    if "p_value" not in df.columns and "pIC50" in df.columns:
+        df = df.copy()
+        df["endpoint"] = "pIC50"
+        df["standard_type"] = df.get("standard_type", "IC50")
+        df["p_value"] = df["pIC50"]
+
+    required_columns = {"target", "target_name", "split", "smiles", "endpoint", "p_value", "source"}
+    missing = required_columns.difference(df.columns)
+    if missing:
+        raise ValueError(f"Missing required endpoint benchmark columns: {sorted(missing)}")
+
+    feature_rows = []
+    for smiles in df["smiles"]:
+        feature_rows.append(calculate_descriptor_features(str(smiles)))
+    feature_df = pd.DataFrame(feature_rows, columns=FEATURE_NAMES)
+    work_df = pd.concat([df.reset_index(drop=True), feature_df], axis=1)
+
+    model_payload: dict[str, Any] = {
+        "model_version": "demo-cpu-endpoint-ridge-v1",
+        "model_kind": "cpu_descriptor_endpoint_ridge",
+        "device": "cpu",
+        "feature_names": FEATURE_NAMES,
+        "context_of_use": ENDPOINT_CONTEXT_OF_USE,
+        "training": {
+            "algorithm": "sklearn.linear_model.Ridge",
+            "alpha": alpha,
+            "dataset_path": str(dataset_path.as_posix()),
+            "dataset_source": _dataset_source_label(work_df),
+            "random_seed": None,
+        },
+        "endpoints": {},
+    }
+    report_payload: dict[str, Any] = {
+        "model_version": model_payload["model_version"],
+        "model_kind": model_payload["model_kind"],
+        "device": "cpu",
+        "context_of_use": ENDPOINT_CONTEXT_OF_USE,
+        "benchmark_dataset": {
+            "path": str(dataset_path.as_posix()),
+            "source": _dataset_source_label(work_df),
+            "rows": int(len(work_df)),
+            "splits": sorted(work_df["split"].unique().tolist()),
+            "endpoints": sorted(work_df["endpoint"].unique().tolist()),
+        },
+        "endpoints": {},
+    }
+
+    for endpoint, endpoint_df in work_df.groupby("endpoint", sort=True):
+        endpoint_key = str(endpoint)
+        model_payload["endpoints"][endpoint_key] = {"targets": {}}
+        report_payload["endpoints"][endpoint_key] = {"targets": {}}
+
+        for target, target_df in endpoint_df.groupby("target", sort=True):
+            train_df = target_df[target_df["split"] == "train"].copy()
+            if train_df.empty:
+                raise ValueError(f"Target {target} {endpoint_key} has no train split")
+
+            scaler = StandardScaler()
+            x_train = scaler.fit_transform(train_df[FEATURE_NAMES].to_numpy(dtype=float))
+            y_train = train_df["p_value"].to_numpy(dtype=float)
+            regressor = Ridge(alpha=alpha)
+            regressor.fit(x_train, y_train)
+
+            domain = _build_domain(train_df)
+            split_metrics = {}
+            for split_name, split_df in target_df.groupby("split", sort=True):
+                split_metrics[split_name] = _evaluate_split(
+                    regressor,
+                    scaler,
+                    split_df,
+                    y_column="p_value",
+                )
+
+            residual_rmse = split_metrics.get("scaffold_test", split_metrics["train"])["rmse"]
+            if residual_rmse is None or math.isnan(residual_rmse):
+                residual_rmse = split_metrics["train"]["rmse"]
+            residual_rmse = max(float(residual_rmse or 0.0), 0.25)
+
+            target_name = str(train_df["target_name"].iloc[0])
+            target_payload = {
+                "target_name": target_name,
+                "endpoint": endpoint_key,
+                "coefficients": [float(value) for value in regressor.coef_],
+                "intercept": float(regressor.intercept_),
+                "scaler_mean": [float(value) for value in scaler.mean_],
+                "scaler_scale": [
+                    float(value) if float(value) != 0.0 else 1.0 for value in scaler.scale_
+                ],
+                "residual_rmse": round(residual_rmse, 4),
+                "applicability_domain": domain,
+                "metrics": split_metrics,
+            }
+            model_payload["endpoints"][endpoint_key]["targets"][target] = target_payload
+            report_payload["endpoints"][endpoint_key]["targets"][target] = {
+                "target_name": target_name,
+                "n_train": int(len(train_df)),
+                "metrics": split_metrics,
+                "applicability_domain": domain,
+            }
+
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    model_path.write_text(json.dumps(model_payload, indent=2), encoding="utf-8")
+    report_path.write_text(json.dumps(report_payload, indent=2), encoding="utf-8")
+    return model_path, report_path
+
+
 def _build_domain(train_df: pd.DataFrame) -> dict[str, Any]:
     ranges = {}
     for name in FEATURE_NAMES:
@@ -309,9 +544,11 @@ def _evaluate_split(
     regressor: Ridge,
     scaler: StandardScaler,
     split_df: pd.DataFrame,
+    *,
+    y_column: str = "pIC50",
 ) -> dict[str, float | int | None]:
     x_values = scaler.transform(split_df[FEATURE_NAMES].to_numpy(dtype=float))
-    y_true = split_df["pIC50"].to_numpy(dtype=float)
+    y_true = split_df[y_column].to_numpy(dtype=float)
     y_pred = regressor.predict(x_values)
     rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
     mae = float(mean_absolute_error(y_true, y_pred))

@@ -13,7 +13,7 @@ sponsor or reviewer can test without GPU access.
 The project started as a DAT activity predictor and now demonstrates a modular
 discovery pipeline for:
 
-- multi-target pIC50 modeling across DAT, 5-HT2A, CB1, CB2, and opioid receptors
+- multi-target pIC50 and pKi modeling across DAT, 5-HT2A, CB1, CB2, and opioid receptors
 - RDKit descriptors, ECFP4/MACCS fingerprints, SMARTS flags, and graph features
 - elastic-looped Transformer regression as a third deep-learning path after
   descriptor Transformer and GNN baselines
@@ -33,11 +33,11 @@ regulatory, or manufacturing decision system.
 | Field | Current public evidence |
 | --- | --- |
 | Model surface | Transformer pIC50 workflow, optional GNN adapters, elastic-looped Transformer path, ensemble hooks, uncertainty reporting, and no-model compound assessment paths |
-| Dataset surface | ChEMBL-backed target activity workflows for DAT, 5-HT2A, CB1, CB2, and opioid receptors, plus SMILES file triage inputs |
+| Dataset surface | ChEMBL-backed pIC50/pKi target activity workflows for DAT, 5-HT2A, CB1, CB2, and opioid receptors, plus SMILES file triage inputs |
 | Feature engineering | RDKit descriptors, ECFP4/MACCS fingerprints, SMARTS flags, ETKDGv3 3D descriptors, graph features, ADMET proxies, and synthetic accessibility scoring |
 | Repro command | `uv sync` then `uv run python cli.py train --target CHEMBL238 --optimize` and `uv run python cli.py assess --smiles "CCN(CC)CC"` |
 | Metrics to inspect | Unit/integration tests cover model, pipeline, discovery extension, and structure integration contracts; promote benchmark tables here when a calibrated public run is available |
-| Limitations | Research triage only; pIC50, ADMET, docking, and synthesis outputs require calibration and expert review before real-world decisions |
+| Limitations | Research triage only; pIC50/pKi, ADMET, docking, and synthesis outputs require calibration and expert review before real-world decisions |
 
 ## Third Deep-Learning Path: ELT
 
@@ -170,35 +170,64 @@ claims production-grade accuracy. The next pharma evaluation step is a governed
 multi-target ChEMBL or sponsor snapshot with locked data lineage, stronger
 models, calibration, drift monitoring, and lifecycle change control.
 
-Expanded psychopharmacology check:
+Endpoint-aware psychopharmacology standard panel:
 
 ```bash
-uv run python -B scripts/run_psychopharm_literature_check.py
+uv run python -B cli.py psychopharm-check
 ```
 
-The expanded check uses `data/psychopharm_literature_reference.csv` and writes
-`artifacts/psychopharm_literature_prediction_check.json`. It compares local
-predictions with curated ChEMBL literature rows for Adderall as a
-d-amphetamine proxy, LSD, delta-9-THC, morphine, methylphenidate, and bkMDMA
-(methylone). Values are pX-style ChEMBL potency values (`Ki`, `IC50`, or
-`EC50`), so they are a psychopharmacology sanity check, not a harmonized
-endpoint validation.
+The standard panel now separates `IC50 -> pIC50`, `Ki -> pKi`, and keeps
+`EC50 -> pEC50` as literature-only context instead of pooling all rows into a
+single potency mean. The reference file covers 10 compounds: LSD, bkMDMA
+(methylone), MDMA, Adderall as a d-amphetamine proxy, methylphenidate, morphine,
+tramadol, delta-9-THC, CBD, and CBN. The JSON report includes per-endpoint n,
+mean, median, SD, SEM, ChEMBL document IDs, DOI/PubMed IDs, RDKit descriptor
+features, endpoint predictions, uncertainty, and applicability-domain status.
 
-| Compound | Target | Literature mean pX | Predicted pIC50 | Delta | Fold error | Domain |
-| --- | --- | ---: | ---: | ---: | ---: | --- |
-| Adderall / d-amphetamine | DAT | 7.0367 | 5.9340 | -1.1027 | 12.6678 | out |
-| LSD | 5HT2A | 8.3186 | 6.7230 | -1.5956 | 39.4094 | out |
-| delta-9-THC | CB1 | 7.9650 | 7.9280 | -0.0370 | 1.0889 | in |
-| delta-9-THC | CB2 | 7.6800 | 6.4260 | -1.2540 | 17.9473 | out |
-| Morphine | mu-opioid | 8.6300 | 6.3950 | -2.2350 | 171.7908 | in |
-| Morphine | delta-opioid | 6.6850 | 6.1670 | -0.5180 | 3.2961 | in |
-| Methylphenidate | DAT | 7.3250 | 6.1540 | -1.1710 | 14.8252 | in |
-| bkMDMA / methylone | DAT | 6.8800 | 5.6640 | -1.2160 | 16.4437 | in |
+The checked endpoint ChEMBL training snapshot has 2,103 rows. It is deliberately
+small enough for CPU runs, but still keeps endpoint and scaffold/external split
+lineage visible through
+`artifacts/chembl_endpoint_activity_snapshot.manifest.json`.
 
-This is useful portfolio evidence because it surfaces where the model is already
-directional (delta-9-THC at CB1), where target-family calibration is weak
-(morphine at mu-opioid, LSD at 5HT2A), and where endpoint or species mismatch
-must be labeled before an LLM or reviewer quotes the result.
+| Endpoint | Target | Train n | Scaffold R2 | Scaffold RMSE | External R2 | External RMSE |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| pIC50 | CB1 (CHEMBL218) | 157 | 0.3335 | 0.8558 | 0.4064 | 0.4242 |
+| pIC50 | 5HT2A (CHEMBL224) | 169 | 0.2938 | 1.2142 | 0.1282 | 1.1508 |
+| pIC50 | mu-opioid (CHEMBL233) | 147 | 0.2784 | 1.0827 | -0.1845 | 1.0193 |
+| pIC50 | delta-opioid (CHEMBL236) | 144 | 0.3506 | 1.2635 | 0.0536 | 1.2991 |
+| pIC50 | DAT (CHEMBL238) | 100 | -0.3838 | 1.0344 | 0.0796 | 0.9879 |
+| pIC50 | CB2 (CHEMBL253) | 148 | -0.1090 | 1.2118 | -0.0165 | 0.6824 |
+| pKi | CB1 (CHEMBL218) | 117 | 0.3322 | 0.9891 | -0.4526 | 1.0583 |
+| pKi | 5HT2A (CHEMBL224) | 120 | 0.2592 | 0.9822 | -0.5980 | 1.0443 |
+| pKi | mu-opioid (CHEMBL233) | 157 | -0.0086 | 1.3639 | -0.1398 | 1.2508 |
+| pKi | delta-opioid (CHEMBL236) | 130 | -1.6863 | 1.8044 | -0.3634 | 1.7561 |
+| pKi | DAT (CHEMBL238) | 109 | 0.0559 | 1.0929 | 0.3718 | 1.0212 |
+| pKi | CB2 (CHEMBL253) | 131 | 0.2822 | 0.8283 | -0.7024 | 1.0760 |
+
+Standard-panel prediction check:
+
+| Compound | Target | Lit pIC50 mean | Pred pIC50 | Delta pIC50 | Lit pKi mean | Pred pKi | Delta pKi | Domain pIC50 / pKi |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| Adderall / d-amphetamine | DAT | 6.5400 | 7.5960 | 1.0560 | 6.9600 | 6.4620 | -0.4980 | out / out |
+| CBD / Cannabidiol | CB1 | 5.4200 | 5.5680 | 0.1480 | 5.6067 | 8.2240 | 2.6173 | out / in |
+| CBD / Cannabidiol | CB2 |  | 8.2550 |  | 5.6567 | 8.5450 | 2.8883 | out / in |
+| CBN / Cannabinol | CB1 |  | 5.8190 |  | 7.1333 | 7.3900 | 0.2567 | out / in |
+| CBN / Cannabinol | CB2 |  | 7.3560 |  | 7.2400 | 7.4960 | 0.2560 | out / in |
+| delta-9-THC / Dronabinol | CB1 | 8.5500 | 5.8190 | -2.7310 | 7.8480 | 7.9410 | 0.0930 | out / in |
+| delta-9-THC / Dronabinol | CB2 |  | 8.7800 |  | 7.6800 | 8.6080 | 0.9280 | out / in |
+| LSD / Lysergide | 5HT2A |  | 7.3450 |  | 8.4920 | 6.8160 | -1.6760 | out / out |
+| MDMA / Midomafetamine | DAT | 5.7300 | 7.5300 | 1.8000 | 6.0500 | 6.7300 | 0.6800 | in / out |
+| Methylphenidate / Methylphenidate | DAT | 7.4350 | 7.2420 | -0.1930 | 7.2150 | 6.5590 | -0.6560 | in / out |
+| Morphine / Morphine | mu-opioid |  | 7.5160 |  | 8.6300 | 7.2600 | -1.3700 | in / in |
+| Morphine / Morphine | delta-opioid |  | 7.5510 |  | 6.6850 | 6.9630 | 0.2780 | in / out |
+| Tramadol / Tramadol | mu-opioid | 5.1200 | 6.8910 | 1.7710 | 5.7500 | 7.1660 | 1.4160 | in / in |
+| Tramadol / Tramadol | delta-opioid |  | 7.6360 |  | 8.0300 | 7.6900 | -0.3400 | out / out |
+| bkMDMA / methylone | DAT |  | 6.8790 |  |  | 6.6830 |  | in / out |
+
+This is portfolio-grade evidence, not a validated QSAR claim. It is useful
+because it shows endpoint separation, chemical-family coverage, descriptor-level
+applicability-domain reporting, and honest weak spots before an LLM or reviewer
+quotes the result.
 
 The graph and README statistics are regenerated from local JSON evidence:
 
@@ -310,6 +339,10 @@ Available endpoints:
 - `POST /predict`
 - `POST /assess`
 
+When `PIC50_MODEL_PATH=models/chembl_endpoint_cpu_model.json`, `/predict`
+accepts `{"endpoints": ["pIC50", "pKi"]}` and returns endpoint-keyed
+predictions with uncertainty and applicability-domain payloads.
+
 The CPU demo is intentionally scoped as research triage and portfolio evidence.
 It is not a clinical, regulatory, manufacturing, or patient-care decision
 system. Replace `data/demo_pic50_benchmark.csv` with a governed ChEMBL or sponsor
@@ -325,8 +358,37 @@ uv run python -B cli.py build-chembl-snapshot \
 ```
 
 The snapshot command writes a CSV plus a JSON manifest containing filters, split
-policy, per-target counts, and a SHA-256 checksum. Generated ChEMBL snapshots are
-local evaluation artifacts and are not committed by default.
+policy, per-target counts, and a SHA-256 checksum. Large generated ChEMBL
+snapshots are local evaluation artifacts by default; the small endpoint MVP
+snapshot is explicitly whitelisted for review reproducibility.
+
+Build the endpoint-aware pIC50/pKi snapshot and CPU model used for the standard
+psychopharmacology panel:
+
+```bash
+uv run python -B cli.py build-chembl-endpoint-snapshot \
+  --targets CHEMBL238,CHEMBL224,CHEMBL218,CHEMBL253,CHEMBL233,CHEMBL236 \
+  --endpoints pIC50,pKi \
+  --output data/chembl_endpoint_activity_snapshot.csv \
+  --manifest artifacts/chembl_endpoint_activity_snapshot.manifest.json \
+  --max-rows-per-target-endpoint 200
+
+uv run python -B cli.py build-endpoint-cpu-model \
+  --dataset data/chembl_endpoint_activity_snapshot.csv \
+  --output models/chembl_endpoint_cpu_model.json \
+  --report artifacts/chembl_endpoint_cpu_benchmark.json
+```
+
+Predict both endpoints for an input SMILES:
+
+```bash
+uv run python -B cli.py predict \
+  --model models/chembl_endpoint_cpu_model.json \
+  --target CHEMBL238 \
+  --endpoints pIC50,pKi \
+  --smiles "COC(=O)C(c1ccccc1)C1CCCCN1" \
+  --uncertainty
+```
 
 Run a no-model compound assessment. This produces ADMET and synthesis outputs,
 and can optionally include 3D, reaction, and image features.
@@ -528,8 +590,9 @@ QSAR product. It has the minimum pieces a serious reviewer expects to see:
   split policy, row counts, and checksum.
 - Risk-based performance report: target-level R2, RMSE, and MAE for train,
   scaffold-test, and external splits.
-- Statistical sanity check: methylphenidate literature IC50 comparison with
-  error bars, p-value, effect size, and observed power.
+- Statistical sanity checks: methylphenidate literature IC50 comparison with
+  error bars, p-value, effect size, and observed power, plus a pIC50/pKi
+  standard-panel report for 10 psychopharmacology reference compounds.
 - Applicability domain and uncertainty: every CPU prediction returns domain
   status and uncertainty for review-time triage.
 - API contract: `/health`, `/predict`, and `/assess` expose model status,

@@ -9,10 +9,34 @@ from pathlib import Path
 
 import pytest
 
-from src.models.demo_cpu import CPUDemoPIC50Model, build_demo_cpu_artifacts
+from src.models.demo_cpu import (
+    CPUDemoEndpointModel,
+    CPUDemoPIC50Model,
+    build_demo_cpu_artifacts,
+    build_demo_endpoint_cpu_artifacts,
+)
 
 ASPIRIN = "CC(=O)OC1=CC=CC=C1C(=O)O"
 DATASET_PATH = Path("data/demo_pic50_benchmark.csv")
+ENDPOINT_SNAPSHOT_ROWS = [
+    "snapshot_id,target,target_name,endpoint,standard_type,molecule_chembl_id,canonical_smiles,p_value,split,scaffold_smiles,source",
+    "s1,CHEMBL238,DAT,pIC50,IC50,M1,CCO,4.1,train,CCO,ChEMBL",
+    "s1,CHEMBL238,DAT,pIC50,IC50,M2,CCCO,4.4,train,CCCO,ChEMBL",
+    "s1,CHEMBL238,DAT,pIC50,IC50,M3,CCCCO,4.7,train,CCCCO,ChEMBL",
+    "s1,CHEMBL238,DAT,pIC50,IC50,M4,c1ccccc1,4.0,train,c1ccccc1,ChEMBL",
+    "s1,CHEMBL238,DAT,pIC50,IC50,M5,CCN(CC)CC,5.0,scaffold_test,CCN,ChEMBL",
+    "s1,CHEMBL238,DAT,pIC50,IC50,M6,CC(=O)O,3.8,external,CC(=O)O,ChEMBL",
+    "s1,CHEMBL238,DAT,pKi,Ki,K1,CCO,5.1,train,CCO,ChEMBL",
+    "s1,CHEMBL238,DAT,pKi,Ki,K2,CCCO,5.4,train,CCCO,ChEMBL",
+    "s1,CHEMBL238,DAT,pKi,Ki,K3,CCCCO,5.7,train,CCCCO,ChEMBL",
+    "s1,CHEMBL238,DAT,pKi,Ki,K4,c1ccccc1,5.0,train,c1ccccc1,ChEMBL",
+    "s1,CHEMBL238,DAT,pKi,Ki,K5,CCN(CC)CC,6.0,scaffold_test,CCN,ChEMBL",
+    "s1,CHEMBL238,DAT,pKi,Ki,K6,CC(=O)O,4.8,external,CC(=O)O,ChEMBL",
+]
+
+
+def _write_endpoint_snapshot(path: Path) -> None:
+    path.write_text("\n".join(ENDPOINT_SNAPSHOT_ROWS), encoding="utf-8")
 
 
 def test_build_demo_artifacts_from_fixed_benchmark(tmp_path: Path):
@@ -59,6 +83,28 @@ def test_build_demo_artifacts_accepts_chembl_snapshot_schema(tmp_path: Path):
     report_payload = json.loads(report_path.read_text(encoding="utf-8"))
     assert report_payload["targets"]["CHEMBL238"]["n_train"] == 4
     assert report_payload["benchmark_dataset"]["source"] == "ChEMBL"
+
+
+def test_build_endpoint_artifacts_predicts_pic50_and_pki(tmp_path: Path):
+    dataset_path = tmp_path / "endpoint_snapshot.csv"
+    _write_endpoint_snapshot(dataset_path)
+    model_path = tmp_path / "endpoint_model.json"
+    report_path = tmp_path / "endpoint_report.json"
+
+    build_demo_endpoint_cpu_artifacts(dataset_path, model_path, report_path)
+
+    report_payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert {"pIC50", "pKi"}.issubset(report_payload["endpoints"])
+    assert report_payload["endpoints"]["pKi"]["targets"]["CHEMBL238"]["n_train"] == 4
+
+    model = CPUDemoEndpointModel.from_file(model_path)
+    pic50 = model.predict(ASPIRIN, target="CHEMBL238", endpoint="pIC50")
+    pki = model.predict(ASPIRIN, target="CHEMBL238", endpoint="pKi")
+
+    assert pic50.endpoint == "pIC50"
+    assert pki.endpoint == "pKi"
+    assert pic50.endpoint_prediction != pki.endpoint_prediction
+    assert pki.applicability_domain["method"] == "descriptor_min_max"
 
 
 def test_cpu_demo_model_predicts_with_uncertainty_and_domain(tmp_path: Path):
@@ -128,6 +174,50 @@ def test_fastapi_predict_and_assess_use_cpu_demo_model(tmp_path: Path):
     assessment_payload = assessment.json()
     assert assessment_payload["pIC50_prediction"] is not None
     assert assessment_payload["admet"]["success"]
+
+
+def test_fastapi_predicts_endpoint_model_pic50_and_pki(tmp_path: Path):
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    dataset_path = tmp_path / "endpoint_snapshot.csv"
+    model_path = tmp_path / "endpoint_model.json"
+    report_path = tmp_path / "endpoint_report.json"
+    _write_endpoint_snapshot(dataset_path)
+    build_demo_endpoint_cpu_artifacts(dataset_path, model_path, report_path)
+
+    from src.api.app import create_app
+
+    client = TestClient(create_app(model_path=model_path))
+
+    health = client.get("/health")
+    assert health.status_code == 200
+    assert set(health.json()["model"]["endpoints"]) == {"pIC50", "pKi"}
+
+    prediction = client.post(
+        "/predict",
+        json={"smiles": ASPIRIN, "target": "CHEMBL238", "endpoints": ["pIC50", "pKi"]},
+    )
+    assert prediction.status_code == 200
+    prediction_payload = prediction.json()
+    assert set(prediction_payload["predictions"]) == {"pIC50", "pKi"}
+    assert prediction_payload["predictions"]["pIC50"]["pIC50_prediction"] is not None
+    assert prediction_payload["predictions"]["pKi"]["pKi_prediction"] is not None
+
+    assessment = client.post(
+        "/assess",
+        json={
+            "smiles": ASPIRIN,
+            "target": "CHEMBL238",
+            "include_3d": False,
+            "include_reactions": False,
+            "include_image": False,
+        },
+    )
+    assert assessment.status_code == 200
+    assessment_payload = assessment.json()
+    assert assessment_payload["model"]["endpoint"] == "pIC50"
+    assert assessment_payload["endpoint_prediction"] is not None
 
 
 def test_cli_predict_accepts_cpu_demo_json_model(tmp_path: Path):

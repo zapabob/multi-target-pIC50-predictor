@@ -8,7 +8,10 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.data.chembl_snapshot import build_chembl_pic50_snapshot
+from src.data.chembl_snapshot import (
+    build_chembl_endpoint_snapshot,
+    build_chembl_pic50_snapshot,
+)
 
 
 class FakeChEMBLLoader:
@@ -97,3 +100,68 @@ def test_build_chembl_snapshot_applies_per_target_row_limit(tmp_path: Path):
     assert len(snapshot) == 4
     assert manifest["targets"]["CHEMBL238"]["row_count"] == 4
     assert manifest["filters"]["max_rows_per_target"] == 4
+
+
+class FakeEndpointActivityLoader:
+    """Deterministic test double for endpoint ChEMBL activity loading."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str, bool]] = []
+
+    def load_activity(
+        self,
+        target_id: str,
+        endpoint: str,
+        force_refresh: bool = False,
+    ) -> pd.DataFrame:
+        self.calls.append((target_id, endpoint, force_refresh))
+        offset = 0.0 if endpoint == "pIC50" else 1.0
+        standard_type = "IC50" if endpoint == "pIC50" else "Ki"
+        return pd.DataFrame(
+            {
+                "molecule_chembl_id": [f"{target_id}_{endpoint}_M{i}" for i in range(1, 7)],
+                "canonical_smiles": [
+                    "CC(=O)OC1=CC=CC=C1C(=O)O",
+                    "CC(C)CC1=CC=C(C=C1)C(C)C(=O)O",
+                    "NCCc1ccc(O)c(O)c1",
+                    "NCCc1c[nH]c2ccccc12",
+                    "CN(C)CCOC(c1ccccc1)c1ccccc1",
+                    "Cn1cnc2c1c(=O)n(C)c(=O)n2C",
+                ],
+                "endpoint": endpoint,
+                "standard_type": standard_type,
+                "standard_value_nM": [1000.0, 500.0, 250.0, 125.0, 62.5, 2000.0],
+                "p_value": [4.3 + offset, 4.8 + offset, 5.2 + offset, 5.7 + offset, 6.1 + offset, 3.9 + offset],
+            }
+        )
+
+
+def test_build_chembl_endpoint_snapshot_writes_pic50_and_pki(tmp_path: Path):
+    output_path = tmp_path / "chembl_endpoint_snapshot.csv"
+    manifest_path = tmp_path / "chembl_endpoint_snapshot.manifest.json"
+    loader = FakeEndpointActivityLoader()
+
+    result = build_chembl_endpoint_snapshot(
+        targets=["CHEMBL238"],
+        endpoints=["pIC50", "pKi"],
+        output_path=output_path,
+        manifest_path=manifest_path,
+        loader=loader,
+        force_refresh=True,
+        snapshot_id="endpoint-test",
+    )
+
+    assert result.csv_path == output_path
+    assert loader.calls == [("CHEMBL238", "pIC50", True), ("CHEMBL238", "pKi", True)]
+
+    snapshot = pd.read_csv(output_path)
+    assert len(snapshot) == 12
+    assert {"pIC50", "pKi"} == set(snapshot["endpoint"])
+    assert {"IC50", "Ki"} == set(snapshot["standard_type"])
+    assert {"train", "scaffold_test", "external"} <= set(snapshot["split"])
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    csv_checksum = hashlib.sha256(output_path.read_bytes()).hexdigest()
+    assert manifest["snapshot_id"] == "endpoint-test"
+    assert manifest["csv_sha256"] == csv_checksum
+    assert manifest["targets"]["CHEMBL238"]["endpoints"]["pKi"]["row_count"] == 6

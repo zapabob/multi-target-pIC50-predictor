@@ -30,9 +30,20 @@ def train(args):
 
 def predict(args):
     if Path(args.model).suffix.lower() == ".json":
-        from src.models.demo_cpu import CPUDemoPIC50Model
+        from src.models.demo_cpu import CPUDemoEndpointModel, CPUDemoPIC50Model
 
-        model = CPUDemoPIC50Model.from_file(args.model)
+        model_payload = json.loads(Path(args.model).read_text(encoding="utf-8"))
+        endpoint_names = [
+            endpoint.strip()
+            for endpoint in getattr(args, "endpoints", "pIC50").split(",")
+            if endpoint.strip()
+        ]
+        is_endpoint_model = "endpoints" in model_payload
+        model = (
+            CPUDemoEndpointModel(model_payload)
+            if is_endpoint_model
+            else CPUDemoPIC50Model(model_payload)
+        )
         smiles_list = []
         if args.smiles:
             smiles_list.append(args.smiles)
@@ -46,25 +57,50 @@ def predict(args):
             print("No SMILES provided")
             return
 
-        if args.uncertainty:
-            print("SMILES\tTarget\tPredicted_pIC50\tUncertainty\tApplicabilityDomain")
+        if is_endpoint_model:
+            if args.uncertainty:
+                print("SMILES\tTarget\tEndpoint\tPredicted_pValue\tUncertainty\tApplicabilityDomain")
+            else:
+                print("SMILES\tTarget\tEndpoint\tPredicted_pValue")
         else:
-            print("SMILES\tTarget\tPredicted_pIC50")
+            if args.uncertainty:
+                print("SMILES\tTarget\tPredicted_pIC50\tUncertainty\tApplicabilityDomain")
+            else:
+                print("SMILES\tTarget\tPredicted_pIC50")
 
         for sm in smiles_list:
-            try:
-                result = model.predict(sm, target=args.target)
-            except ValueError as exc:
-                print(f"{sm}\tPrediction failed: {exc}")
-                continue
-            if args.uncertainty:
-                domain = "in" if result.applicability_domain["in_domain"] else "out"
-                print(
-                    f"{sm}\t{result.target}\t{result.pIC50_prediction:.4f}\t"
-                    f"{result.uncertainty:.4f}\t{domain}"
-                )
+            if is_endpoint_model:
+                for endpoint in endpoint_names:
+                    try:
+                        result = model.predict(sm, target=args.target, endpoint=endpoint)
+                    except ValueError as exc:
+                        print(f"{sm}\t{args.target}\t{endpoint}\tPrediction failed: {exc}")
+                        continue
+                    if args.uncertainty:
+                        domain = "in" if result.applicability_domain["in_domain"] else "out"
+                        print(
+                            f"{sm}\t{result.target}\t{result.endpoint}\t"
+                            f"{result.endpoint_prediction:.4f}\t{result.uncertainty:.4f}\t{domain}"
+                        )
+                    else:
+                        print(
+                            f"{sm}\t{result.target}\t{result.endpoint}\t"
+                            f"{result.endpoint_prediction:.4f}"
+                        )
             else:
-                print(f"{sm}\t{result.target}\t{result.pIC50_prediction:.4f}")
+                try:
+                    result = model.predict(sm, target=args.target)
+                except ValueError as exc:
+                    print(f"{sm}\tPrediction failed: {exc}")
+                    continue
+                if args.uncertainty:
+                    domain = "in" if result.applicability_domain["in_domain"] else "out"
+                    print(
+                        f"{sm}\t{result.target}\t{result.pIC50_prediction:.4f}\t"
+                        f"{result.uncertainty:.4f}\t{domain}"
+                    )
+                else:
+                    print(f"{sm}\t{result.target}\t{result.pIC50_prediction:.4f}")
         return
 
     DATPredictor, _ = load_dat_predictor_tools()
@@ -541,6 +577,19 @@ def build_demo_cpu_model(args):
     print(f"Benchmark report saved to {report_path}")
 
 
+def build_endpoint_cpu_model(args):
+    """Build the endpoint-aware CPU-only demo model and benchmark report."""
+    from src.models.demo_cpu import build_demo_endpoint_cpu_artifacts
+
+    model_path, report_path = build_demo_endpoint_cpu_artifacts(
+        Path(args.dataset),
+        Path(args.output),
+        Path(args.report),
+    )
+    print(f"CPU endpoint model saved to {model_path}")
+    print(f"Endpoint benchmark report saved to {report_path}")
+
+
 def build_chembl_snapshot(args):
     """Build a fixed ChEMBL pIC50 snapshot CSV and manifest."""
     from src.data.chembl_snapshot import build_chembl_pic50_snapshot
@@ -560,6 +609,42 @@ def build_chembl_snapshot(args):
     print(f"Manifest saved to {result.manifest_path}")
     print(f"Rows: {result.row_count}")
     print(f"CSV sha256: {result.csv_sha256}")
+
+
+def build_chembl_endpoint_snapshot(args):
+    """Build a fixed ChEMBL pIC50/pKi endpoint snapshot CSV and manifest."""
+    from src.data.chembl_snapshot import build_chembl_endpoint_snapshot as build_snapshot
+
+    targets = [target.strip() for target in args.targets.split(",") if target.strip()]
+    endpoints = [endpoint.strip() for endpoint in args.endpoints.split(",") if endpoint.strip()]
+    result = build_snapshot(
+        targets=targets,
+        endpoints=endpoints,
+        output_path=Path(args.output),
+        manifest_path=Path(args.manifest),
+        force_refresh=args.force_refresh,
+        max_rows_per_target_endpoint=args.max_rows_per_target_endpoint,
+        random_seed=args.random_seed,
+        scaffold_test_fraction=args.scaffold_test_fraction,
+        external_fraction=args.external_fraction,
+    )
+    print(f"ChEMBL endpoint snapshot saved to {result.csv_path}")
+    print(f"Manifest saved to {result.manifest_path}")
+    print(f"Rows: {result.row_count}")
+    print(f"CSV sha256: {result.csv_sha256}")
+
+
+def psychopharm_check(args):
+    """Run endpoint-aware psychopharmacology standard panel checks."""
+    from scripts.run_psychopharm_literature_check import run_psychopharm_literature_check
+
+    report = run_psychopharm_literature_check(
+        reference_path=Path(args.reference),
+        model_path=Path(args.model),
+        output_path=Path(args.output),
+    )
+    print(f"Psychopharmacology endpoint check saved to {args.output}")
+    print(f"Comparisons: {report['summary']['comparison_count']}")
 
 
 parser = argparse.ArgumentParser(
@@ -587,6 +672,11 @@ predict_parser.add_argument("--model", required=True, help="path to trained mode
 predict_parser.add_argument("--target", default="CHEMBL238", help="target label or ChEMBL target ID")
 predict_parser.add_argument("--smiles", help="SMILES string")
 predict_parser.add_argument("--input", help="path to file with SMILES, one per line")
+predict_parser.add_argument(
+    "--endpoints",
+    default="pIC50",
+    help="comma-separated endpoints for endpoint JSON models, e.g. pIC50,pKi",
+)
 predict_parser.add_argument(
     "--uncertainty", action="store_true", help="include uncertainty estimation"
 )
@@ -744,6 +834,45 @@ chembl_snapshot_parser.add_argument("--scaffold-test-fraction", type=float, defa
 chembl_snapshot_parser.add_argument("--external-fraction", type=float, default=0.15)
 chembl_snapshot_parser.set_defaults(func=build_chembl_snapshot)
 
+chembl_endpoint_snapshot_parser = subparsers.add_parser(
+    "build-chembl-endpoint-snapshot",
+    help="build a fixed ChEMBL pIC50/pKi endpoint snapshot and manifest",
+)
+chembl_endpoint_snapshot_parser.add_argument(
+    "--targets",
+    default="CHEMBL238,CHEMBL224,CHEMBL218,CHEMBL253,CHEMBL233,CHEMBL236",
+    help="comma-separated ChEMBL target IDs",
+)
+chembl_endpoint_snapshot_parser.add_argument(
+    "--endpoints",
+    default="pIC50,pKi",
+    help="comma-separated endpoint labels, currently pIC50 and pKi",
+)
+chembl_endpoint_snapshot_parser.add_argument(
+    "--output",
+    default="data/chembl_endpoint_activity_snapshot.csv",
+    help="output snapshot CSV path",
+)
+chembl_endpoint_snapshot_parser.add_argument(
+    "--manifest",
+    default="artifacts/chembl_endpoint_activity_snapshot.manifest.json",
+    help="output manifest JSON path",
+)
+chembl_endpoint_snapshot_parser.add_argument(
+    "--max-rows-per-target-endpoint",
+    type=int,
+    help="optional per-target endpoint row cap for dry runs",
+)
+chembl_endpoint_snapshot_parser.add_argument(
+    "--force-refresh",
+    action="store_true",
+    help="refresh ChEMBL cache before writing the snapshot",
+)
+chembl_endpoint_snapshot_parser.add_argument("--random-seed", type=int, default=42)
+chembl_endpoint_snapshot_parser.add_argument("--scaffold-test-fraction", type=float, default=0.15)
+chembl_endpoint_snapshot_parser.add_argument("--external-fraction", type=float, default=0.15)
+chembl_endpoint_snapshot_parser.set_defaults(func=build_chembl_endpoint_snapshot)
+
 demo_cpu_parser = subparsers.add_parser(
     "build-demo-cpu-model",
     help="build CPU-only demo model and fixed benchmark report",
@@ -764,6 +893,48 @@ demo_cpu_parser.add_argument(
     help="output benchmark report JSON path",
 )
 demo_cpu_parser.set_defaults(func=build_demo_cpu_model)
+
+endpoint_cpu_parser = subparsers.add_parser(
+    "build-endpoint-cpu-model",
+    help="build CPU-only pIC50/pKi endpoint model and benchmark report",
+)
+endpoint_cpu_parser.add_argument(
+    "--dataset",
+    default="data/chembl_endpoint_activity_snapshot.csv",
+    help="endpoint benchmark CSV path",
+)
+endpoint_cpu_parser.add_argument(
+    "--output",
+    default="models/chembl_endpoint_cpu_model.json",
+    help="output endpoint CPU model JSON path",
+)
+endpoint_cpu_parser.add_argument(
+    "--report",
+    default="artifacts/chembl_endpoint_cpu_benchmark.json",
+    help="output endpoint benchmark report JSON path",
+)
+endpoint_cpu_parser.set_defaults(func=build_endpoint_cpu_model)
+
+psychopharm_parser = subparsers.add_parser(
+    "psychopharm-check",
+    help="compare standard psychopharmacology compounds with pIC50/pKi predictions",
+)
+psychopharm_parser.add_argument(
+    "--reference",
+    default="data/psychopharm_literature_reference.csv",
+    help="curated standard-compound reference CSV",
+)
+psychopharm_parser.add_argument(
+    "--model",
+    default="models/chembl_endpoint_cpu_model.json",
+    help="endpoint CPU model JSON path",
+)
+psychopharm_parser.add_argument(
+    "--output",
+    default="artifacts/psychopharm_literature_prediction_check.json",
+    help="output report JSON path",
+)
+psychopharm_parser.set_defaults(func=psychopharm_check)
 
 # 新機能：TxGemmaダウンロード
 download_parser = subparsers.add_parser(
@@ -790,8 +961,13 @@ Basic Commands:
   benchmark          Run benchmark evaluation
   build-chembl-snapshot
                      Build fixed ChEMBL pIC50 snapshot and manifest
+  build-chembl-endpoint-snapshot
+                     Build fixed ChEMBL pIC50/pKi snapshot and manifest
   build-demo-cpu-model
                      Build CPU-only demo model and benchmark report
+  build-endpoint-cpu-model
+                     Build CPU-only endpoint pIC50/pKi model and report
+  psychopharm-check  Compare standard panel literature values with predictions
   download-txgemma   Download TxGemma-9B-Chat-GGUF from Hugging Face
 
 Examples:
@@ -833,6 +1009,13 @@ Examples:
 
   # Freeze a ChEMBL evaluation snapshot
   python cli.py build-chembl-snapshot --targets CHEMBL238,CHEMBL224 --output data/chembl_pic50_snapshot.csv --manifest artifacts/chembl_pic50_snapshot.manifest.json
+
+  # Freeze an endpoint-aware pIC50/pKi snapshot and build the CPU model
+  python cli.py build-chembl-endpoint-snapshot --targets CHEMBL238,CHEMBL224 --endpoints pIC50,pKi
+  python cli.py build-endpoint-cpu-model
+
+  # Compare standard psychopharmacology references with endpoint predictions
+  python cli.py psychopharm-check
 
   # Download TxGemma-9B-Chat-GGUF
   python cli.py download-txgemma
