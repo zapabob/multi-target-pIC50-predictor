@@ -383,6 +383,9 @@ def build_demo_endpoint_cpu_artifacts(
         df["endpoint"] = "pIC50"
         df["standard_type"] = df.get("standard_type", "IC50")
         df["p_value"] = df["pIC50"]
+    if "training_eligible" in df.columns:
+        eligible = df["training_eligible"].map(_coerce_bool)
+        df = df[eligible].copy()
 
     required_columns = {"target", "target_name", "split", "smiles", "endpoint", "p_value", "source"}
     missing = required_columns.difference(df.columns)
@@ -509,6 +512,14 @@ def _dataset_source_label(df: pd.DataFrame) -> str:
     if len(sources) == 1:
         return sources[0]
     return "mixed"
+
+
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return bool(value)
+    return str(value).strip().lower() in {"true", "1", "yes", "y"}
 
 
 def _domain_check(

@@ -4,40 +4,46 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
 
-A CPU-runnable drug-discovery MVP for target-specific pIC50 prediction,
-compound triage, and early medicinal chemistry decision support. The current
-pharma-facing path is deliberately narrow: fixed ChEMBL snapshots, scaffold and
-external splits, uncertainty, applicability domain, and a FastAPI surface that a
-sponsor or reviewer can test without GPU access.
+A research-only QSAR validation prototype for retrospective analysis of public
+bioactivity data. The current DAT-centered path is deliberately narrow: fixed
+ChEMBL snapshots, assay-context metadata, scaffold and external splits,
+uncertainty, applicability domain, and reproducible CLI/API surfaces that a
+scientific reviewer can inspect without GPU access.
+
+This repository is not intended to recommend, rank, synthesize, optimize, dose,
+or support human use of psychoactive substances or therapeutic candidates.
+Predictions are exploratory software outputs and must not be interpreted as
+prospective potency, safety, medical, regulatory, or manufacturing evidence.
 
 The project started as a DAT activity predictor and now demonstrates a modular
-discovery pipeline for:
+research pipeline for:
 
 - multi-target pIC50 and pKi modeling across DAT, 5-HT2A, CB1, CB2, and opioid receptors
 - RDKit descriptors, ECFP4/MACCS fingerprints, SMARTS flags, and graph features
 - elastic-looped Transformer regression as a third deep-learning path after
   descriptor Transformer and GNN baselines
 - ETKDG 3D conformer generation with geometry descriptors
-- ADMET and developability triage
-- synthetic accessibility scoring with SA score and SCScore-style proxies
-- retrosynthesis and forward-reaction baseline planning
+- ADMET and developability descriptors for non-decisional research review
+- synthetic accessibility scoring interfaces kept separate from QSAR claims
+- reaction-planning interfaces kept separate from public potency reporting
 - molecule image features for multimodal image + structure experiments
 - optional Prefect/Airflow-style automation hooks
 - future AlphaFold3 and docking simulation integration contracts
 
-This code is intended for research and prioritization. It is not a clinical,
-regulatory, or manufacturing decision system.
+See [docs/research_only_qsar_validation_plan.md](docs/research_only_qsar_validation_plan.md)
+for the current safety boundary, MVP gates, BioRender figure plan, and
+GitHub/Hugging Face release checklist.
 
 ## AI Engineering Evidence Card
 
 | Field | Current public evidence |
 | --- | --- |
 | Model surface | Transformer pIC50 workflow, optional GNN adapters, elastic-looped Transformer path, ensemble hooks, uncertainty reporting, and no-model compound assessment paths |
-| Dataset surface | ChEMBL-backed pIC50/pKi target activity workflows for DAT, 5-HT2A, CB1, CB2, and opioid receptors, plus SMILES file triage inputs |
+| Dataset surface | ChEMBL-backed pIC50/pKi target activity workflows for DAT, 5-HT2A, CB1, CB2, and opioid receptors, with assay-context lineage and SMILES inputs treated as retrospective research queries |
 | Feature engineering | RDKit descriptors, ECFP4/MACCS fingerprints, SMARTS flags, ETKDGv3 3D descriptors, graph features, ADMET proxies, and synthetic accessibility scoring |
 | Repro command | `uv sync` then `uv run python cli.py train --target CHEMBL238 --optimize` and `uv run python cli.py assess --smiles "CCN(CC)CC"` |
 | Metrics to inspect | Unit/integration tests cover model, pipeline, discovery extension, and structure integration contracts; promote benchmark tables here when a calibrated public run is available |
-| Limitations | Research triage only; pIC50/pKi, ADMET, docking, and synthesis outputs require calibration and expert review before real-world decisions |
+| Limitations | Research-only retrospective analysis; pIC50/pKi, ADMET, docking, synthesis, and route outputs require calibration, provenance review, and expert approval before any real-world interpretation |
 
 ## Third Deep-Learning Path: ELT
 
@@ -126,13 +132,13 @@ The opioid slice includes checked mu-opioid (`CHEMBL233`) and delta-opioid
 (`CHEMBL236`) rows. Kappa-opioid (`CHEMBL237`) remains mapped in code, but the
 local ChEMBL fetch timed out before producing a checked snapshot.
 
-## Pharma MVP Evidence Snapshot
+## Research-Only QSAR Evidence Snapshot
 
 This README is written for four reviewers at once:
 
 | Audience | What to inspect | Why it matters |
 | --- | --- | --- |
-| Pharma R&D / translational science | Fixed CHEMBL238 snapshot, methylphenidate literature check, target-level R2/RMSE/MAE, context of use | Shows the model is framed as research-use decision support, with evidence separated from regulatory claims |
+| Pharmacology / cheminformatics review | Fixed CHEMBL238 snapshot, methylphenidate literature check, target-level R2/RMSE/MAE, context of use | Shows the model is framed as retrospective research software, with evidence separated from regulatory or therapeutic claims |
 | MLOps | Dataset manifest, split policy, checksum, JSON model artifact, CPU reproducibility, `/health` endpoint | Makes data lineage, reproducibility, deployment shape, and lifecycle hooks visible |
 | LLMOps | Structured API outputs, model version, uncertainty, applicability-domain status, research-only language | Lets an LLM copilot quote bounded evidence instead of inventing model confidence or use claims |
 | AI engineering | RDKit descriptors, scikit-learn CPU baseline, FastAPI, tests, Docker CPU service | Gives a small but complete reference path from data to model to service |
@@ -235,6 +241,113 @@ The graph and README statistics are regenerated from local JSON evidence:
 uv run python -B scripts/build_pharma_mvp_readme_assets.py
 ```
 
+## DAT QSAR Research Summary
+
+This repository can be read as a research-only software MVP for DAT-centered
+retrospective QSAR validation. The present focus is not to recommend compounds
+for use, synthesis, optimization, or progression. It is to make the data, model
+assumptions, uncertainty, and assay-context limitations visible enough for a
+cheminformatics, pharmacology, or ML reviewer to criticize and improve the
+workflow.
+
+The current DAT-centered path uses CHEMBL238 as a reproducible target case. The
+modeling goal is endpoint-aware prediction for `pIC50` and `pKi`, with special
+attention to methylphenidate, amphetamine-like reference compounds, cocaine-like
+DAT pharmacology, phenethylamine scaffolds, aminorex-family structures,
+Betanamin/pemoline, 4-MAR, 4,4-DMAR, and a 4B-MAR candidate structure. These
+compounds are handled as research reference structures and validation stress
+tests, not as development recommendations.
+
+Recent MVP additions make the workflow more suitable for scientific review:
+
+- CHEMBL238 endpoint snapshots can be fetched without the former small row cap.
+- Assay metadata is retained so assay type, species, cell system, tissue, and
+  binding-vs-uptake modality can be separated instead of silently pooled.
+- Repeated measurements for the same compound and assay context are aggregated
+  by median or robust mean.
+- Endpoint values keep `IC50 -> pIC50` and `Ki -> pKi` separate.
+- Inactive activity handling supports the project rule that values at or above
+  `1000 uM` are inactive for research triage.
+- dIQR-style outlier flags are tracked in the dataset manifest.
+- The candidate panel now exposes descriptor features, SMILES token sequences,
+  and RDKit molecular node graphs as explicit input representations.
+- CUDA-backed compact Transformer, GNN, and elastic-looped Transformer models
+  can be evaluated after the CPU baseline.
+- Optuna can run after the first baseline pass, with 50-trial MVP settings now
+  used for the CHEMBL238 candidate workflow.
+- Consensus output reports median, mean, variance, range, and member-model
+  predictions instead of hiding disagreement behind one scalar value.
+
+The most recent CHEMBL238 full-endpoint run produced 4,374 aggregated rows from
+4,769 measurements. The CPU Ridge baseline remains intentionally modest:
+external RMSE was 0.9289 for `pIC50` and 1.0937 for `pKi`. That is useful as a
+baseline, but it is not strong enough to call the CPU-only model a validated
+QSAR system.
+
+The 4B-MAR CUDA deep50 run is a stronger engineering stress test. With 50
+Optuna trials and 50 epochs per compact model, the 4B-MAR consensus median was
+6.1702 for `pIC50` and 5.7715 for `pKi`. The `pIC50` members were comparatively
+stable (`SD = 0.2760`), while `pKi` had high model disagreement (`SD = 1.2856`):
+ELT predicted 4.2293 and GNN predicted 7.3700. The GNN `pKi` refit reached RMSE
+0.7943, close to the provisional scaffold/external target range, but the member
+disagreement means this result should be treated as a hypothesis for model
+improvement. The correct reporting action for the current `pKi` result is to
+disclose disagreement and withhold decisive numeric interpretation.
+
+The main scientific weaknesses are now explicit:
+
+- The CPU baseline is too weak for confident scaffold extrapolation.
+- Binding and uptake assays should be trained and reported as separate model
+  contexts, not only separated in the dataset summary.
+- Species, tissue, and cell-system effects need stronger filtering and
+  per-context performance tables.
+- Local aminorex and phenethylamine chemical neighborhoods remain sparse.
+- Candidate scoring should train each endpoint/context model once and score
+  candidate batches, rather than refitting deep models per candidate.
+- Uncertainty calibration is still residual-RMSE based and should be replaced
+  or supplemented by conformal, ensemble, or repeated-split calibration.
+- Mechanistic interpretation should remain separate from QSAR prediction until
+  supported by curated assay and structure evidence.
+
+### Review Prompt for GPT-5.5 Pro
+
+Use the following prompt when asking a stronger reviewer model for critique:
+
+```text
+You are reviewing a research-only QSAR validation software MVP for retrospective
+DAT bioactivity analysis and assay-context-aware reporting. The project
+uses ChEMBL CHEMBL238 data, endpoint-aware pIC50/pKi modeling, assay-context
+metadata, RDKit descriptors, SMILES token sequences, molecular node graphs,
+CPU Ridge, compact Transformer, GNN, and elastic-looped Transformer models.
+
+Please critique the README and technical direction as a medicinal chemistry,
+psychopharmacology, QSAR validation, and software-engineering reviewer.
+
+Important safety boundary: do not provide synthesis routes, dosing advice,
+human-use recommendations, or guidance for creating or optimizing controlled
+psychoactive substances. Keep the review focused on data governance, assay
+stratification, model validation, uncertainty calibration, software design,
+MLOps, LLM-assisted reporting, and bounded research-only reporting.
+
+Current evidence:
+- Full CHEMBL238 endpoint snapshot: 4,374 aggregated rows from 4,769
+  measurements.
+- CPU Ridge external RMSE: pIC50 0.9289, pKi 1.0937.
+- 4B-MAR CUDA deep50 consensus median: pIC50 6.1702, pKi 5.7715.
+- 4B-MAR pKi member disagreement is high: ELT 4.2293 vs GNN 7.3700.
+- Best 4B-MAR pKi GNN refit RMSE: 0.7943.
+
+Please identify:
+1. The top scientific validity risks.
+2. The top software-engineering risks.
+3. What should be implemented before calling this a credible QSAR MVP.
+4. What should be removed or reworded to avoid overclaiming.
+5. How to structure the next milestone for binding-vs-uptake, species, and
+   local chemical-series validation.
+6. What figures or tables should be added for a BioRender-style scientific
+   summary figure.
+```
+
 ## Repository Layout
 
 ```text
@@ -305,7 +418,7 @@ See [docs/uv_environment.md](docs/uv_environment.md) for more details.
 
 ## Quick Start
 
-### CPU-Only Pharma MVP Demo
+### CPU-Only Research Demo
 
 The repository includes a small CPU-only demo model for portfolio and stakeholder
 walkthroughs. It uses a fixed descriptor benchmark, a scikit-learn Ridge model,
@@ -348,7 +461,7 @@ It is not a clinical, regulatory, manufacturing, or patient-care decision
 system. Replace `data/demo_pic50_benchmark.csv` with a governed ChEMBL or sponsor
 snapshot before using the benchmark for scientific claims.
 
-Freeze a ChEMBL pIC50 evaluation snapshot for a more serious pharma review:
+Freeze a ChEMBL pIC50 evaluation snapshot for a more serious research review:
 
 ```bash
 uv run python -B cli.py build-chembl-snapshot \
@@ -503,7 +616,9 @@ production-grade prediction.
 - complexity drivers such as stereocenters, ring count, graph complexity,
   spiro atoms, bridgehead atoms, and flexibility
 
-Use these outputs to rank compounds before synthesis planning or docking.
+Use these outputs as non-decisional descriptors for retrospective review. Do
+not use them to rank compounds for synthesis planning, progression, dosing, or
+human-use decisions.
 
 ### Reaction Route Prediction
 
@@ -579,13 +694,15 @@ The current codebase still contains legacy Ruff issues outside the newly added
 discovery modules. Treat a full-project Ruff cleanup as a separate refactoring
 task.
 
-## Pharma MVP Readiness
+## Research MVP Readiness
 
-The current repo is suitable as a portfolio-grade pharma MVP, not as a validated
-QSAR product. It has the minimum pieces a serious reviewer expects to see:
+The current repo is suitable as a research-only QSAR validation prototype, not
+as a validated QSAR product. It has the minimum pieces a serious reviewer
+expects to see:
 
-- Clear context of use: research triage and decision support only; not clinical,
-  regulatory, manufacturing, or patient-care decision-making.
+- Clear context of use: retrospective research analysis only; not clinical,
+  regulatory, manufacturing, patient-care, therapeutic, synthesis, dosing, or
+  compound-optimization decision-making.
 - Fixed data path: demo fixture plus a CHEMBL238 ChEMBL snapshot with manifest,
   split policy, row counts, and checksum.
 - Risk-based performance report: target-level R2, RMSE, and MAE for train,
@@ -600,7 +717,8 @@ QSAR product. It has the minimum pieces a serious reviewer expects to see:
 - MLOps shape: JSON model artifact, benchmark JSON, reproducible CLI commands,
   Docker CPU service, tests, and explicit residual risks.
 - LLMOps shape: structured model outputs and bounded research-use language make
-  the service safer to wrap with an LLM assistant or report generator.
+  the service safer to wrap with an LLM assistant or report generator, provided
+  the assistant withholds unsupported potency interpretation.
 
 What this MVP proves:
 
@@ -611,20 +729,21 @@ What this MVP proves:
 - Model limitations are visible: the current CPU baseline underpredicts
   methylphenidate, so the demo invites model improvement instead of hiding it.
 
-What remains before pharma-grade technical diligence:
+What remains before credible QSAR technical diligence:
 
-- Governed ChEMBL or sponsor snapshot with frozen version, license review, and
-  data-quality gates.
+- Governed ChEMBL snapshot with frozen version, license review, and data-quality
+  gates.
 - Stronger baselines and calibrated uncertainty across multiple target families.
-- External validation by target and chemical series, including assay-protocol
-  stratification.
+- External validation by target, assay context, species, and chemical series,
+  including binding-vs-uptake stratification.
 - Model registry, approval workflow, drift monitoring, rollback, audit logging,
   and lifecycle management.
 - Mechanistic interpretation where feasible, aligned with QSAR validation
   expectations.
 
-See [docs/pharma_mvp_cpu_demo.md](docs/pharma_mvp_cpu_demo.md) for the model
-card-style details, regulatory alignment notes, and CPU deployment commands.
+See [docs/pharma_mvp_cpu_demo.md](docs/pharma_mvp_cpu_demo.md) and
+[docs/research_only_qsar_validation_plan.md](docs/research_only_qsar_validation_plan.md)
+for model-card-style details, release gates, and CPU/GPU validation commands.
 
 ## Docker Production Stack
 
@@ -656,7 +775,8 @@ Service defaults:
 
 - Use scaffold splits when evaluating medicinal chemistry generalization.
 - Keep pIC50, ADMET, synthesis, docking, and AlphaFold-derived evidence
-  separate until you have calibration data for combined ranking.
+  separate until calibration data and expert review justify any combined
+  interpretation.
 - Track uncertainty and applicability domain for every prediction.
 - Validate reaction routes with a chemist and a dedicated retrosynthesis engine
   before synthesis decisions.

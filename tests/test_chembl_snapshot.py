@@ -159,9 +159,142 @@ def test_build_chembl_endpoint_snapshot_writes_pic50_and_pki(tmp_path: Path):
     assert {"pIC50", "pKi"} == set(snapshot["endpoint"])
     assert {"IC50", "Ki"} == set(snapshot["standard_type"])
     assert {"train", "scaffold_test", "external"} <= set(snapshot["split"])
+    assert {"activity_class", "diqr_outlier", "training_eligible"}.issubset(snapshot.columns)
+    assert set(snapshot["training_eligible"]) == {True}
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     csv_checksum = hashlib.sha256(output_path.read_bytes()).hexdigest()
     assert manifest["snapshot_id"] == "endpoint-test"
     assert manifest["csv_sha256"] == csv_checksum
     assert manifest["targets"]["CHEMBL238"]["endpoints"]["pKi"]["row_count"] == 6
+    assert manifest["split_policy"]["method"] == "sklearn_group_shuffle"
+    assert manifest["filters"]["inactive_threshold_uM"] == 1000.0
+
+
+class FakeEndpointQualityLoader:
+    """Endpoint loader with a clear dIQR outlier and inactive high-value row."""
+
+    def load_activity(
+        self,
+        target_id: str,
+        endpoint: str,
+        force_refresh: bool = False,
+    ) -> pd.DataFrame:
+        del target_id, force_refresh
+        return pd.DataFrame(
+            {
+                "molecule_chembl_id": [f"M{i}" for i in range(1, 7)],
+                "canonical_smiles": [
+                    "CCO",
+                    "CCCO",
+                    "CCCCO",
+                    "CCN",
+                    "CCCN",
+                    "c1ccccc1",
+                ],
+                "endpoint": endpoint,
+                "standard_type": "IC50",
+                "standard_value_nM": [
+                    1000.0,
+                    794.3,
+                    631.0,
+                    501.2,
+                    398.1,
+                    100_000_000.0,
+                ],
+                "p_value": [6.0, 6.1, 6.2, 6.3, 6.4, 1.0],
+            }
+        )
+
+
+def test_build_chembl_endpoint_snapshot_flags_diqr_and_inactive_rows(tmp_path: Path):
+    output_path = tmp_path / "quality.csv"
+    manifest_path = tmp_path / "quality.manifest.json"
+
+    build_chembl_endpoint_snapshot(
+        targets=["CHEMBL238"],
+        endpoints=["pIC50"],
+        output_path=output_path,
+        manifest_path=manifest_path,
+        loader=FakeEndpointQualityLoader(),
+        snapshot_id="quality",
+        split_method="stable_hash",
+    )
+
+    snapshot = pd.read_csv(output_path)
+    inactive = snapshot[snapshot["activity_class"] == "inactive_ge_threshold"]
+    outliers = snapshot[snapshot["diqr_outlier"]]
+
+    assert len(snapshot) == 6
+    assert len(inactive) == 1
+    assert len(outliers) == 1
+    assert outliers.iloc[0]["molecule_chembl_id"] == "M6"
+    assert snapshot["training_eligible"].sum() == 5
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    endpoint_manifest = manifest["targets"]["CHEMBL238"]["endpoints"]["pIC50"]
+    assert endpoint_manifest["activity_class_counts"]["inactive_ge_threshold"] == 1
+    assert endpoint_manifest["diqr_outlier_count"] == 1
+    assert endpoint_manifest["training_eligible_count"] == 5
+
+
+class FakeEndpointContextLoader:
+    """Endpoint loader with repeated measurements in separate assay contexts."""
+
+    def load_activity(
+        self,
+        target_id: str,
+        endpoint: str,
+        force_refresh: bool = False,
+    ) -> pd.DataFrame:
+        del target_id, endpoint, force_refresh
+        return pd.DataFrame(
+            {
+                "molecule_chembl_id": ["M1", "M1", "M1"],
+                "canonical_smiles": ["CCO", "CCO", "CCO"],
+                "endpoint": ["pIC50", "pIC50", "pIC50"],
+                "standard_type": ["IC50", "IC50", "IC50"],
+                "standard_value_nM": [10_000.0, 1_000.0, 100.0],
+                "p_value": [5.0, 6.0, 7.0],
+                "assay_chembl_id": ["A1", "A1", "A2"],
+                "assay_type": ["B", "B", "B"],
+                "assay_type_description": ["Binding", "Binding", "Binding"],
+                "assay_description": ["DAT uptake assay", "DAT uptake assay", "DAT binding assay"],
+                "assay_organism": ["Homo sapiens", "Homo sapiens", "Homo sapiens"],
+                "assay_cell_type": ["HEK293", "HEK293", "HEK293"],
+                "assay_tissue": ["", "", ""],
+                "bao_format": ["BAO_0000219", "BAO_0000219", "BAO_0000219"],
+                "bao_label": ["cell-based format", "cell-based format", "cell-based format"],
+                "assay_modality": ["uptake", "uptake", "binding"],
+            }
+        )
+
+
+def test_build_chembl_endpoint_snapshot_aggregates_within_assay_context(tmp_path: Path):
+    output_path = tmp_path / "context.csv"
+    manifest_path = tmp_path / "context.manifest.json"
+
+    build_chembl_endpoint_snapshot(
+        targets=["CHEMBL238"],
+        endpoints=["pIC50"],
+        output_path=output_path,
+        manifest_path=manifest_path,
+        loader=FakeEndpointContextLoader(),
+        snapshot_id="context",
+        split_method="stable_hash",
+        aggregation_method="median",
+    )
+
+    snapshot = pd.read_csv(output_path)
+    assert len(snapshot) == 2
+    assert {"uptake", "binding"} == set(snapshot["assay_modality"])
+
+    uptake = snapshot[snapshot["assay_modality"] == "uptake"].iloc[0]
+    assert uptake["measurement_count"] == 2
+    assert uptake["p_value"] == 5.5
+    assert uptake["aggregation_method"] == "median"
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    endpoint_manifest = manifest["targets"]["CHEMBL238"]["endpoints"]["pIC50"]
+    assert endpoint_manifest["measurement_count"] == 3
+    assert endpoint_manifest["assay_modality_counts"] == {"binding": 1, "uptake": 1}

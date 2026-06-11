@@ -107,6 +107,33 @@ def test_build_endpoint_artifacts_predicts_pic50_and_pki(tmp_path: Path):
     assert pki.applicability_domain["method"] == "descriptor_min_max"
 
 
+def test_build_endpoint_artifacts_honors_training_eligible_flag(tmp_path: Path):
+    dataset_path = tmp_path / "endpoint_snapshot.csv"
+    dataset_path.write_text(
+        "\n".join(
+            [
+                "snapshot_id,target,target_name,endpoint,standard_type,molecule_chembl_id,canonical_smiles,p_value,training_eligible,split,scaffold_smiles,source",
+                "s1,CHEMBL238,DAT,pIC50,IC50,M1,CCO,4.1,true,train,CCO,ChEMBL",
+                "s1,CHEMBL238,DAT,pIC50,IC50,M2,CCCO,4.4,true,train,CCCO,ChEMBL",
+                "s1,CHEMBL238,DAT,pIC50,IC50,M3,CCCCO,4.7,true,train,CCCCO,ChEMBL",
+                "s1,CHEMBL238,DAT,pIC50,IC50,M4,c1ccccc1,4.0,true,train,c1ccccc1,ChEMBL",
+                "s1,CHEMBL238,DAT,pIC50,IC50,M5,CCN(CC)CC,5.0,true,scaffold_test,CCN,ChEMBL",
+                "s1,CHEMBL238,DAT,pIC50,IC50,M6,CC(=O)O,3.8,true,external,CC(=O)O,ChEMBL",
+                "s1,CHEMBL238,DAT,pIC50,IC50,M7,CCCCCC,1.0,false,train,CCCCCC,ChEMBL",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    model_path = tmp_path / "endpoint_model.json"
+    report_path = tmp_path / "endpoint_report.json"
+
+    build_demo_endpoint_cpu_artifacts(dataset_path, model_path, report_path)
+
+    report_payload = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report_payload["benchmark_dataset"]["rows"] == 6
+    assert report_payload["endpoints"]["pIC50"]["targets"]["CHEMBL238"]["n_train"] == 4
+
+
 def test_cpu_demo_model_predicts_with_uncertainty_and_domain(tmp_path: Path):
     model_path = tmp_path / "demo_cpu_pic50_model.json"
     report_path = tmp_path / "demo_cpu_benchmark.json"

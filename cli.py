@@ -627,6 +627,10 @@ def build_chembl_endpoint_snapshot(args):
         random_seed=args.random_seed,
         scaffold_test_fraction=args.scaffold_test_fraction,
         external_fraction=args.external_fraction,
+        split_method=args.split_method,
+        diq_multiplier=args.diq_multiplier,
+        inactive_threshold_uM=args.inactive_threshold_um,
+        aggregation_method=args.aggregation_method,
     )
     print(f"ChEMBL endpoint snapshot saved to {result.csv_path}")
     print(f"Manifest saved to {result.manifest_path}")
@@ -645,6 +649,96 @@ def psychopharm_check(args):
     )
     print(f"Psychopharmacology endpoint check saved to {args.output}")
     print(f"Comparisons: {report['summary']['comparison_count']}")
+
+
+def chembl238_candidate_panel(args):
+    """Run the CHEMBL238 candidate panel for a single SMILES."""
+    from scripts.run_chembl238_candidate_panel import (
+        run_chembl238_candidate_panel,
+        _split_csv_arg,
+    )
+
+    report = run_chembl238_candidate_panel(
+        candidate_label=args.label,
+        candidate_smiles=args.smiles,
+        snapshot_path=Path(args.snapshot),
+        model_path=Path(args.model),
+        reference_path=Path(args.reference),
+        output_path=Path(args.output),
+        target=args.target,
+        endpoints=tuple(
+            endpoint.strip() for endpoint in args.endpoints.split(",") if endpoint.strip()
+        ),
+        random_seed=args.random_seed,
+        inactive_threshold_uM=args.inactive_threshold_um,
+        diq_multiplier=args.diq_multiplier,
+        run_deep=args.run_deep,
+        deep_models=tuple(
+            model_name.strip()
+            for model_name in args.deep_models.split(",")
+            if model_name.strip()
+        ),
+        deep_epochs=args.deep_epochs,
+        optuna_trials=args.optuna_trials,
+        hidden_dim=args.hidden_dim,
+        batch_size=args.batch_size,
+        learning_rate=args.learning_rate,
+        device=args.device,
+        assay_modalities=_split_csv_arg(args.assay_modalities),
+        assay_types=_split_csv_arg(args.assay_types),
+        assay_organisms=_split_csv_arg(args.assay_organisms),
+        assay_cell_types=_split_csv_arg(args.assay_cell_types),
+        assay_tissues=_split_csv_arg(args.assay_tissues),
+    )
+    print(f"CHEMBL238 candidate panel saved to {args.output}")
+    print(f"Candidate: {report['candidate']['label']}")
+    for endpoint, payload in report["models"]["cpu_endpoint_ridge"]["predictions"].items():
+        print(f"{endpoint}: {payload['value']} +/- {payload['uncertainty']}")
+
+
+def chembl238_qsar_comparison(args):
+    """Run a CHEMBL238 QSAR comparison across a candidate set."""
+    from scripts.run_chembl238_candidate_panel import (
+        run_chembl238_qsar_comparison,
+        _split_csv_arg,
+    )
+
+    report = run_chembl238_qsar_comparison(
+        candidate_set_path=Path(args.candidate_set) if args.candidate_set else None,
+        snapshot_path=Path(args.snapshot),
+        model_path=Path(args.model),
+        reference_path=Path(args.reference),
+        output_path=Path(args.output),
+        table_output_path=Path(args.table_output) if args.table_output else None,
+        target=args.target,
+        endpoints=tuple(
+            endpoint.strip() for endpoint in args.endpoints.split(",") if endpoint.strip()
+        ),
+        random_seed=args.random_seed,
+        inactive_threshold_uM=args.inactive_threshold_um,
+        diq_multiplier=args.diq_multiplier,
+        run_deep=args.run_deep,
+        deep_models=tuple(
+            model_name.strip()
+            for model_name in args.deep_models.split(",")
+            if model_name.strip()
+        ),
+        deep_epochs=args.deep_epochs,
+        optuna_trials=args.optuna_trials,
+        hidden_dim=args.hidden_dim,
+        batch_size=args.batch_size,
+        learning_rate=args.learning_rate,
+        device=args.device,
+        assay_modalities=_split_csv_arg(args.assay_modalities),
+        assay_types=_split_csv_arg(args.assay_types),
+        assay_organisms=_split_csv_arg(args.assay_organisms),
+        assay_cell_types=_split_csv_arg(args.assay_cell_types),
+        assay_tissues=_split_csv_arg(args.assay_tissues),
+    )
+    print(f"CHEMBL238 QSAR comparison saved to {args.output}")
+    if report.get("table_output_path"):
+        print(f"Comparison table saved to {report['table_output_path']}")
+    print(f"Candidates: {len(report['candidate_reports'])}")
 
 
 parser = argparse.ArgumentParser(
@@ -871,6 +965,30 @@ chembl_endpoint_snapshot_parser.add_argument(
 chembl_endpoint_snapshot_parser.add_argument("--random-seed", type=int, default=42)
 chembl_endpoint_snapshot_parser.add_argument("--scaffold-test-fraction", type=float, default=0.15)
 chembl_endpoint_snapshot_parser.add_argument("--external-fraction", type=float, default=0.15)
+chembl_endpoint_snapshot_parser.add_argument(
+    "--split-method",
+    choices=["stable_hash", "sklearn_group_shuffle"],
+    default="sklearn_group_shuffle",
+    help="endpoint scaffold split method",
+)
+chembl_endpoint_snapshot_parser.add_argument(
+    "--diq-multiplier",
+    type=float,
+    default=2.0,
+    help="dIQR multiplier for endpoint p-value outlier flags",
+)
+chembl_endpoint_snapshot_parser.add_argument(
+    "--inactive-threshold-um",
+    type=float,
+    default=1000.0,
+    help="standard values at or above this uM threshold are labeled inactive",
+)
+chembl_endpoint_snapshot_parser.add_argument(
+    "--aggregation-method",
+    choices=["none", "median", "robust_mean"],
+    default="median",
+    help="aggregate repeated measurements within molecule/endpoint/assay context",
+)
 chembl_endpoint_snapshot_parser.set_defaults(func=build_chembl_endpoint_snapshot)
 
 demo_cpu_parser = subparsers.add_parser(
@@ -937,6 +1055,127 @@ psychopharm_parser.add_argument(
 psychopharm_parser.set_defaults(func=psychopharm_check)
 
 # 新機能：TxGemmaダウンロード
+candidate_panel_parser = subparsers.add_parser(
+    "chembl238-candidate-panel",
+    help="predict pIC50/pKi for a CHEMBL238 candidate with descriptor and scaffold context",
+)
+candidate_panel_parser.add_argument("--label", default="4B-MAR")
+candidate_panel_parser.add_argument(
+    "--smiles",
+    default="CC1C(OC(=N1)N)C2=CC=C(C=C2)Br",
+    help="candidate SMILES",
+)
+candidate_panel_parser.add_argument("--target", default="CHEMBL238")
+candidate_panel_parser.add_argument(
+    "--snapshot",
+    default="data/chembl_endpoint_activity_snapshot.csv",
+    help="endpoint snapshot CSV path",
+)
+candidate_panel_parser.add_argument(
+    "--model",
+    default="models/chembl_endpoint_cpu_model.json",
+    help="endpoint CPU model JSON path",
+)
+candidate_panel_parser.add_argument(
+    "--reference",
+    default="data/psychopharm_literature_reference.csv",
+    help="psychopharmacology literature CSV path",
+)
+candidate_panel_parser.add_argument(
+    "--output",
+    default="artifacts/chembl238_4b_mar_candidate_panel.json",
+    help="output report JSON path",
+)
+candidate_panel_parser.add_argument("--endpoints", default="pIC50,pKi")
+candidate_panel_parser.add_argument("--random-seed", type=int, default=42)
+candidate_panel_parser.add_argument("--inactive-threshold-um", type=float, default=1000.0)
+candidate_panel_parser.add_argument("--diq-multiplier", type=float, default=2.0)
+candidate_panel_parser.add_argument(
+    "--run-deep",
+    action="store_true",
+    help="train compact Transformer/ELT/GNN endpoint models for this candidate",
+)
+candidate_panel_parser.add_argument(
+    "--deep-models",
+    default="transformer,elt,gnn",
+    help="comma-separated deep models to try when --run-deep is set",
+)
+candidate_panel_parser.add_argument("--deep-epochs", type=int, default=50)
+candidate_panel_parser.add_argument("--optuna-trials", type=int, default=50)
+candidate_panel_parser.add_argument("--hidden-dim", type=int, default=64)
+candidate_panel_parser.add_argument("--batch-size", type=int, default=64)
+candidate_panel_parser.add_argument("--learning-rate", type=float, default=3e-4)
+candidate_panel_parser.add_argument("--assay-modalities", default="all")
+candidate_panel_parser.add_argument("--assay-types", default="all")
+candidate_panel_parser.add_argument("--assay-organisms", default="all")
+candidate_panel_parser.add_argument("--assay-cell-types", default="all")
+candidate_panel_parser.add_argument("--assay-tissues", default="all")
+candidate_panel_parser.add_argument(
+    "--device",
+    choices=["cuda", "cpu", "auto"],
+    default="cuda",
+    help="device for compact deep models",
+)
+candidate_panel_parser.set_defaults(func=chembl238_candidate_panel)
+
+qsar_comparison_parser = subparsers.add_parser(
+    "chembl238-qsar-comparison",
+    help="compare CHEMBL238 QSAR predictions across phenethylamine/aminorex candidates",
+)
+qsar_comparison_parser.add_argument(
+    "--candidate-set",
+    default="data/qsar_candidate_set.csv",
+    help="CSV with label,smiles,chemotype,source columns",
+)
+qsar_comparison_parser.add_argument("--target", default="CHEMBL238")
+qsar_comparison_parser.add_argument(
+    "--snapshot",
+    default="data/chembl_endpoint_activity_snapshot.csv",
+    help="endpoint snapshot CSV path",
+)
+qsar_comparison_parser.add_argument(
+    "--model",
+    default="models/chembl_endpoint_cpu_model.json",
+    help="endpoint CPU model JSON path",
+)
+qsar_comparison_parser.add_argument(
+    "--reference",
+    default="data/psychopharm_literature_reference.csv",
+    help="psychopharmacology literature CSV path",
+)
+qsar_comparison_parser.add_argument(
+    "--output",
+    default="artifacts/chembl238_qsar_comparison.json",
+    help="output comparison JSON path",
+)
+qsar_comparison_parser.add_argument(
+    "--table-output",
+    default="artifacts/chembl238_qsar_comparison.csv",
+    help="output comparison table CSV path",
+)
+qsar_comparison_parser.add_argument("--endpoints", default="pIC50,pKi")
+qsar_comparison_parser.add_argument("--random-seed", type=int, default=42)
+qsar_comparison_parser.add_argument("--inactive-threshold-um", type=float, default=1000.0)
+qsar_comparison_parser.add_argument("--diq-multiplier", type=float, default=2.0)
+qsar_comparison_parser.add_argument("--run-deep", action="store_true")
+qsar_comparison_parser.add_argument("--deep-models", default="transformer,elt,gnn")
+qsar_comparison_parser.add_argument("--deep-epochs", type=int, default=50)
+qsar_comparison_parser.add_argument("--optuna-trials", type=int, default=50)
+qsar_comparison_parser.add_argument("--hidden-dim", type=int, default=64)
+qsar_comparison_parser.add_argument("--batch-size", type=int, default=64)
+qsar_comparison_parser.add_argument("--learning-rate", type=float, default=3e-4)
+qsar_comparison_parser.add_argument("--assay-modalities", default="all")
+qsar_comparison_parser.add_argument("--assay-types", default="all")
+qsar_comparison_parser.add_argument("--assay-organisms", default="all")
+qsar_comparison_parser.add_argument("--assay-cell-types", default="all")
+qsar_comparison_parser.add_argument("--assay-tissues", default="all")
+qsar_comparison_parser.add_argument(
+    "--device",
+    choices=["cuda", "cpu", "auto"],
+    default="cuda",
+)
+qsar_comparison_parser.set_defaults(func=chembl238_qsar_comparison)
+
 download_parser = subparsers.add_parser(
     "download-txgemma", help="download TxGemma-9B-Chat-GGUF from Hugging Face"
 )

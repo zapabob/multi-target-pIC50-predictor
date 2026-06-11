@@ -1,0 +1,119 @@
+dataset:
+  name: chembl238_dat_endpoint_snapshot
+  intended_use: research_only_retrospective_qsar_validation
+  prohibited_uses:
+    - compound_recommendation
+    - compound_ranking_for_progression
+    - synthesis_guidance
+    - optimization_guidance
+    - dosing_guidance
+    - human_use_guidance
+    - clinical_decision_making
+    - regulatory_submission
+    - manufacturing_decision
+
+source:
+  provider: ChEMBL
+  target_chembl_id: CHEMBL238
+  target_name: dopamine transporter
+  required_lineage_fields:
+    - activity_id
+    - molecule_chembl_id
+    - assay_chembl_id
+    - document_chembl_id
+    - target_chembl_id
+    - standard_type
+    - standard_relation
+    - standard_units
+    - standard_value
+    - assay_type
+    - assay_organism
+    - assay_cell_type
+    - assay_tissue
+    - bao_format
+    - confidence_score
+
+endpoint_policy:
+  allowed_endpoints:
+    pIC50:
+      source_standard_type: IC50
+      value_units: nM
+    pKi:
+      source_standard_type: Ki
+      value_units: nM
+  do_not_pool:
+    - IC50
+    - Ki
+    - EC50
+    - uptake
+    - binding
+  inactive_threshold:
+    standard_value_uM_greater_equal: 1000
+    label: inactive_for_research_triage
+  outlier_policy:
+    method: dIQR
+    action: track_in_manifest
+
+assay_context_policy:
+  primary_contexts:
+    - human_binding_Ki
+    - human_binding_IC50
+    - human_uptake_IC50
+  secondary_contexts:
+    - rat_binding_Ki
+    - rat_binding_IC50
+    - rat_uptake_IC50
+    - mixed_species_binding
+    - mixed_species_uptake
+  required_group_fields:
+    - molecule_chembl_id
+    - canonical_smiles
+    - endpoint
+    - assay_chembl_id
+    - assay_type
+    - assay_organism
+    - assay_cell_type
+    - assay_tissue
+    - bao_format
+    - assay_modality
+
+aggregation_policy:
+  supported_methods:
+    - none
+    - median
+    - robust_mean
+  default_method: median
+  group_by_assay_context: true
+  retain_measurement_count: true
+
+split_policy:
+  required_splits:
+    - train
+    - scaffold_test
+    - external
+  additional_validation_splits:
+    - random
+    - fingerprint_cluster
+    - document_chembl_id
+    - assay_chembl_id
+    - species_holdout
+    - local_series_holdout
+    - temporal_when_available
+
+prediction_policy:
+  required_outputs:
+    - prediction_value
+    - prediction_interval_90
+    - ensemble_sd
+    - ensemble_range
+    - nearest_neighbor_similarity
+    - within_applicability_domain
+    - assay_context_supported
+    - species_supported
+    - decision
+  withhold_numeric_interpretation_when:
+    - assay_context_unsupported
+    - species_unsupported
+    - outside_applicability_domain
+    - high_ensemble_disagreement
+    - local_neighborhood_sparse

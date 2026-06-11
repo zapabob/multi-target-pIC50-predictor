@@ -1,22 +1,26 @@
-# Pharma MVP CPU Demo
+# Research-Only CPU Demo
 
 ## Purpose
 
-This CPU demo is a portfolio-ready, pharma-facing walkthrough path for
-multi-target pIC50 triage. It is designed to show reproducible product behavior:
-fixed data, a checked-in model artifact, target-level benchmark metrics,
-applicability-domain checks, uncertainty estimates, and FastAPI endpoints.
+This CPU demo is a research-only walkthrough path for retrospective
+multi-target pIC50 validation. It is designed to show reproducible software
+behavior: fixed data, a checked-in model artifact, target-level benchmark
+metrics, applicability-domain checks, uncertainty estimates, and FastAPI
+endpoints.
 
-It is not scientific validation for lead selection. The bundled dataset is a
-small demo fixture. Replace it with a governed ChEMBL or sponsor snapshot before
-using the scores for project decisions.
+It is not scientific validation for lead selection, compound ranking,
+optimization, synthesis, dosing, human-use guidance, clinical decisions,
+regulatory submissions, or manufacturing decisions. The bundled dataset is a
+small demo fixture. Replace it with a governed ChEMBL snapshot before using the
+scores for scientific interpretation.
 
 ## Context of Use
 
-- Intended use: early discovery research triage and software demonstration.
-- Decision role: decision support only.
+- Intended use: retrospective research analysis and software demonstration.
+- Decision role: non-decisional evidence reporting only.
 - Not for: clinical decisions, regulatory submissions, manufacturing release,
-  patient care, or automated compound progression.
+  patient care, automated compound progression, synthesis planning, dosing, or
+  human-use guidance.
 - Endpoint: target-specific pIC50 derived from IC50 nM values.
 - Current model: CPU descriptor Ridge baseline using RDKit descriptors and
   scikit-learn.
@@ -67,9 +71,9 @@ docker compose -f docker-compose.cpu.yml up --build
 
 ## ChEMBL Fixed Snapshot
 
-For a pharma review, replace the demo fixture with a frozen ChEMBL snapshot. This
-prevents silent benchmark drift from live ChEMBL queries and gives reviewers a
-manifest they can inspect.
+For a scientific review, replace the demo fixture with a frozen ChEMBL snapshot.
+This prevents silent benchmark drift from live ChEMBL queries and gives
+reviewers a manifest they can inspect.
 
 ```bash
 uv run python -B cli.py build-chembl-snapshot \
@@ -145,9 +149,9 @@ Primary references:
 - OECD, Principles for QSAR validation:
   https://www.oecd.org/content/dam/oecd/en/topics/policy-sub-issues/assessment-of-chemicals/oecd-principles-for-the-validation-for-regulatory-purposes-of-quantitative-structure-activity-relationship-models.pdf
 
-## Upgrade Path to Pharma MVP
+## Upgrade Path to Credible QSAR Review
 
-1. Replace the demo fixture with a versioned ChEMBL or sponsor data snapshot.
+1. Replace the demo fixture with a versioned ChEMBL data snapshot.
 2. Add assay protocol filters and endpoint harmonization rules.
 3. Expand scaffold split and external validation by target.
 4. Add model cards for each promoted model version.
