@@ -1,3 +1,5 @@
+# Shared security floor for pip/Docker and uv installs.
+aiohttp>=3.14.4
 numpy>=1.21.0
 pandas>=1.3.0
 rdkit>=2024.3.1
