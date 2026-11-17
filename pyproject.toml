@@ -5,6 +5,8 @@ description = "Multi-target pIC50 prediction and drug-discovery triage pipeline"
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 dependencies = [
+    # Security floor: GHSA-xgw8-8ccx-rmqh, GHSA-5rmc-48h2-hvcm, GHSA-h4cc-hm5h-fmm9.
+    "aiohttp>=3.14.4",
     "chembl-webresource-client>=0.10.9",
     "matplotlib>=3.5.0",
     "numpy>=1.26.0",
